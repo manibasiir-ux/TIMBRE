@@ -31,9 +31,16 @@ The dev server is then on <http://localhost:3000>.
 | Add a dependency | `docker compose run --rm cli "npm install <pkg>"` |
 | Lint | `docker compose run --rm cli "npm run lint"` |
 | Typecheck | `docker compose run --rm cli "npm run typecheck"` |
+| Unit tests | `docker compose run --rm cli "npm test"` |
 | Production build | `docker compose run --rm cli "npm run build"` |
+| Regenerate placeholder audio | `docker compose run --rm cli "npm run audio:generate -- --force"` |
+| Clear the build cache | `docker compose run --rm cli "npm run clean"` |
 | Shell in the container | `docker compose run --rm cli bash` |
 | Reset dependencies and caches | `docker compose down -v` |
+
+Removing a route can leave Next's generated types in `.next/dev/types` pointing
+at a file that no longer exists, which fails `typecheck` with a missing-module
+error naming the deleted route. `npm run clean` is the fix.
 
 First-time setup, if `node_modules` has never been populated:
 
@@ -81,6 +88,23 @@ exercise the fallback path and never the real hero.
 Frame rate targets (NFR-06), the render profiles and canvas persistence across
 route transitions have to be checked in a browser on the host, against the
 containerised dev server at <http://localhost:3000>.
+
+## Placeholder audio
+
+The studio's real bed and stems do not exist yet, and the product rests on a
+sculpture reacting to live analysis, so [scripts/generate-audio.mjs](scripts/generate-audio.mjs)
+synthesises real WAV files to analyse. It runs automatically before `dev` and
+`build`, and is dependency-free: WAV encoding, ITU-R BS.1770 K-weighted loudness
+and the FFT are written out rather than pulled in.
+
+`public/audio/` is git-ignored. The output is deterministic, so versioning three
+megabytes of WAV would buy nothing. `src/data/fft-envelope.json` **is** committed:
+it is 3 KB gzipped, it is imported at build time, and it drives the sculpture
+whenever audio is unavailable (edge case E2).
+
+Replacing the placeholders with the studio's masters means dropping files into
+`public/audio/` and re-running the generator for a fresh envelope. No code
+changes.
 
 ## Environment variables
 
