@@ -1,6 +1,7 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { PerspectiveCamera } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
@@ -11,6 +12,10 @@ import {
   detectProfile,
   stepDown,
 } from "@/lib/webgl/detectProfile";
+import {
+  BASE_CAMERA_Z,
+  cameraDistanceForAspect,
+} from "@/lib/webgl/sculptureTuning";
 import { useExperience } from "@/store/useExperience";
 
 import { HeroFallback } from "./HeroFallback";
@@ -32,6 +37,26 @@ import { SoundSculpture } from "./SoundSculpture";
  * outward through a callback rather than touching the store directly, so the
  * policy stays with SceneRoot and this stays a sensor.
  */
+/**
+ * Holds the sculpture at a constant fraction of the viewport whatever its shape,
+ * so the signal calibration in sculptureTuning stays true off 16:9. The maths
+ * and the measurements behind it live with that calibration.
+ *
+ * Declared rather than mutated: reaching into the camera returned by useThree
+ * and assigning position.z works, but it writes to state React owns, and the
+ * compiler is right to reject it. Rendering the camera lets reconciliation
+ * apply the change.
+ */
+function ResponsiveCamera() {
+  const size = useThree((state) => state.size);
+  const distance =
+    size.height > 0
+      ? cameraDistanceForAspect(size.width / size.height)
+      : BASE_CAMERA_Z;
+
+  return <PerspectiveCamera makeDefault fov={42} position={[0, 0, distance]} />;
+}
+
 function PerformanceGuard({ onDegrade }: { onDegrade: () => void }) {
   const monitor = useMemo(() => new FrameRateMonitor(), []);
   const fired = useRef(false);
@@ -105,7 +130,7 @@ export default function SceneRoot() {
       <Canvas
         dpr={settings.dpr}
         frameloop={frameloop}
-        camera={{ position: [0, 0, 5.2], fov: 42 }}
+        camera={{ position: [0, 0, BASE_CAMERA_Z], fov: 42 }}
         gl={{
           antialias: profile === "high",
           powerPreference: "high-performance",
@@ -117,6 +142,7 @@ export default function SceneRoot() {
           gl.domElement.setAttribute("tabindex", "-1");
         }}
       >
+        <ResponsiveCamera />
         <SoundSculpture
           detail={settings.detail}
           reducedMotion={reducedMotion}

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
+import { ConsentGate } from "@/components/consent/ConsentGate";
+import { TransportBar } from "@/components/transport/TransportBar";
 import { SceneMount } from "@/components/webgl/SceneMount";
 import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
@@ -66,6 +68,13 @@ export default function RootLayout({
         <main id="main" className="relative z-10">
           {children}
         </main>
+
+        {/* FR-06: persistent on every route, occupying the band the body has
+            reserved since the token layer. */}
+        <TransportBar />
+
+        {/* FR-01: nothing plays until this is answered. */}
+        <ConsentGate />
 
         {/* Decorative only, and switched off under prefers-reduced-motion. */}
         <div className="grain" data-decorative-motion aria-hidden="true" />

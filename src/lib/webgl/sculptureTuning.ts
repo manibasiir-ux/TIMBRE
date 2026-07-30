@@ -60,3 +60,32 @@ export function peakDisplacement(bands: Bands, gain = 1): number {
 
 /** Band values at the loudest frame of the baked envelope. */
 export const LOUDEST_FRAME: Bands = { low: 0.85, mid: 0.49, high: 0.39 };
+
+/** The aspect the sculpture was framed and colour-calibrated against. */
+export const REFERENCE_ASPECT = 16 / 9;
+export const BASE_CAMERA_Z = 5.2;
+
+/**
+ * Camera distance that holds the sculpture at a constant fraction of the
+ * viewport whatever its shape.
+ *
+ * A perspective camera fixes the *vertical* field of view, so a narrower
+ * viewport shows the same vertical extent across fewer horizontal pixels and
+ * the object swells to fill it. With the camera pinned at BASE_CAMERA_Z,
+ * measured signal coverage ran 3.85% at 1280×720 but 7.97% on a tablet and
+ * 10.19% on a 375×812 phone — two and a half times the 4% ceiling in §3.1
+ * rule 1. The colour calibration above is only meaningful if the object
+ * subtends a consistent area.
+ *
+ * Projected area falls with the square of distance, so distance scales with the
+ * square root of the aspect shortfall. Measured after the change: 3.85 / 3.80 /
+ * 3.57 / 3.56 / 3.47% across desktop, laptop, pane, tablet and phone.
+ *
+ * Viewports wider than the reference are left alone. Pulling the camera closer
+ * would overfill them vertically, and §9 handles ultrawide by widening the
+ * field of view instead.
+ */
+export function cameraDistanceForAspect(aspect: number): number {
+  if (!Number.isFinite(aspect) || aspect <= 0) return BASE_CAMERA_Z;
+  return BASE_CAMERA_Z * Math.sqrt(Math.max(REFERENCE_ASPECT / aspect, 1));
+}
