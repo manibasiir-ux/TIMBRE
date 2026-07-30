@@ -35,6 +35,13 @@ yarn-error.log*
 # The template carries no secrets and documents what the app expects.
 !.env.example
 
+# Synthesised placeholder audio, rebuilt by scripts/generate-audio.mjs on every
+# dev start and build. Deterministic, so it need not be versioned, and it is a
+# few megabytes of WAV that would bloat history for no gain. The baked FFT
+# envelope in src/data IS committed: it is small and the sound-off sculpture
+# imports it at build time.
+/public/audio
+
 # vercel
 .vercel
 
