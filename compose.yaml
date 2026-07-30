@@ -1,0 +1,75 @@
+name: timbre
+
+# Every TIMBRE task runs in a container. Nothing is installed on the host.
+#
+#   docker compose run --rm scaffold          generate the app (once)
+#   docker compose run --rm cli "npm install" install or refresh dependencies
+#   docker compose up web                     dev server on http://localhost:3000
+#   docker compose run --rm cli "npm run lint"
+#   docker compose down -v                    stop and discard the volumes
+#
+# Bind sources are relative on purpose. The absolute host path contains spaces
+# and an apostrophe, which is a quoting hazard, so it is never written down.
+
+x-app-environment: &app-environment
+  NEXT_TELEMETRY_DISABLED: "1"
+  WATCHPACK_POLLING: "true"
+  CHOKIDAR_USEPOLLING: "true"
+
+# The scaffold runs out of /tmp, so the project .npmrc is out of scope for it
+# and the same retry policy has to arrive through the environment.
+x-npm-retry: &npm-retry
+  npm_config_fetch_retries: "5"
+  npm_config_fetch_retry_mintimeout: "20000"
+  npm_config_fetch_retry_maxtimeout: "120000"
+  npm_config_fetch_timeout: "600000"
+
+# node_modules stays on the VM's own filesystem: left on the Windows bind mount
+# every file operation crosses the VM boundary and installs crawl.
+#
+# .next deliberately does NOT get the same treatment. Turbopack splits its state
+# across .next and .next-internal, and putting only one of them on a volume
+# leaves the two on different filesystems, which breaks recompilation.
+x-app-volumes: &app-volumes
+  - .:/app
+  - node_modules:/app/node_modules
+
+volumes:
+  node_modules:
+
+services:
+  # One-shot. Generates the Next.js application, never overwriting a file that
+  # already exists. Uses the stock image because at this point there is no
+  # package.json for the deps layer to build from.
+  scaffold:
+    image: node:22-bookworm-slim
+    profiles: ["setup"]
+    working_dir: /app
+    environment: *npm-retry
+    volumes:
+      - .:/app
+    entrypoint: ["bash", "docker/scaffold.sh"]
+
+  # The development server.
+  web:
+    build:
+      context: .
+      target: dev
+    environment: *app-environment
+    ports:
+      - "3000:3000"
+    volumes: *app-volumes
+    stdin_open: true
+    tty: true
+
+  # One-shot task runner for npm, lint, typecheck, tests and builds.
+  #   docker compose run --rm cli "npm run lint"
+  cli:
+    build:
+      context: .
+      target: dev
+    profiles: ["tools"]
+    environment: *app-environment
+    volumes: *app-volumes
+    entrypoint: ["bash", "-c"]
+    command: ["node --version && npm --version"]
