@@ -1,21 +1,25 @@
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 
 /**
- * Foundations placeholder. This is the hero lockup and metadata block from
- * design specification §6.1 rendered in real tokens, standing in until the
- * WebGL sculpture, the scroll choreography and the transport bar exist. It is
- * here to prove the token layer resolves, not to be the finished home page.
+ * The hero, specification §6.1.
+ *
+ * Composition follows §6.1: the lockup on the 12-column grid with each line
+ * offset, a mono metadata block bottom-left, and the scroll cue bottom-right.
+ * There is deliberately no body copy over the canvas — the earlier placeholder
+ * had a paragraph here and it landed on the sculpture's lit peaks at roughly
+ * 1.1:1 against signal yellow, which no amount of vignette makes readable.
+ *
+ * Still a placeholder below the fold: the manifesto, work rail and everything
+ * after it arrive with the scroll choreography.
  */
 export default function Home() {
   return (
     <>
-      <section className="shell section-rhythm relative">
+      <section className="shell relative flex min-h-dvh flex-col justify-between pt-[18vh] pb-12">
         <div className="scanlines" aria-hidden="true" />
 
-        <h1>
-          <span className="block font-display text-mega text-ink">
-            We make
-          </span>
+        <h1 className="relative">
+          <span className="block font-display text-mega text-ink">We make</span>
           <span className="block font-display text-mega text-ink lg:ml-[16.6%]">
             Brands
           </span>
@@ -24,8 +28,8 @@ export default function Home() {
           </span>
         </h1>
 
-        <div className="mt-16 grid grid-cols-4 gap-4 lg:grid-cols-12">
-          <p className="col-span-4 font-mono text-mono-xs text-ink-70 lg:col-span-3">
+        <div className="relative flex items-end justify-between gap-8">
+          <p className="font-mono text-mono-xs text-ink-70">
             Sonic identity studio
             <br />
             London
@@ -33,11 +37,18 @@ export default function Home() {
             Est. 2019
           </p>
 
-          <p className="col-span-4 font-body text-lead text-ink-70 lg:col-span-6 lg:col-start-6">
-            Sound cannot be screenshotted. This is the foundations layer —
-            palette, type scale, motion tokens and the waveform rule — standing
-            in until the sculpture arrives.
-          </p>
+          {/* §6.1: a 1px vertical rule with a travelling signal dot. The travel
+              itself is scroll-linked and arrives with the motion system. */}
+          <div
+            className="flex flex-col items-center gap-3"
+            aria-hidden="true"
+            data-scroll-cue
+          >
+            <span className="font-mono text-mono-xs text-ink-40">Scroll</span>
+            <span className="relative block h-16 w-px bg-ink-15">
+              <span className="absolute top-0 left-1/2 block size-1 -translate-x-1/2 rounded-full bg-signal" />
+            </span>
+          </div>
         </div>
       </section>
 

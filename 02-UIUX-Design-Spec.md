@@ -391,9 +391,9 @@ const vertex = /* glsl */ `
   void main() {
     vec3 p = position;
     float n = snoise(p * 1.7 + uTime * 0.18);
-    float disp = n * (0.18 + uLow * 0.9) * uGain
-               + sin(p.y * 14.0 + uTime * 3.0) * uMid * 0.09
-               + uHigh * 0.05;
+    float disp = n * (0.05 + uLow * 0.16) * uGain
+               + sin(p.y * 14.0 + uTime * 3.0) * uMid * 0.03
+               + uHigh * 0.02;
     vDisp = disp;
     p += normal * disp;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
@@ -405,7 +405,7 @@ const fragment = /* glsl */ `
   uniform float uMix;
   varying float vDisp;
   void main() {
-    float t = smoothstep(-0.1, 0.5, vDisp);
+    float t = smoothstep(0.05, 0.12, vDisp);
     vec3 c = mix(uBase, uSignal, t * uMix);
     gl_FragColor = vec4(c, 1.0);
   }
@@ -445,15 +445,74 @@ export function SoundSculpture({ detail = 48, gain = 1 }: { detail?: number; gai
 > **Revision note — geometry density.** v1.0 defaulted `detail` to 64.
 > `IcosahedronGeometry` subdivides each of its 20 faces into `(detail + 1)²`
 > triangles, so 64 is 20 × 65² = **84,500 triangles / 253,500 vertices**, each
-> running the simplex-noise displacement above on every frame. That is far past
-> the point of diminishing visual return for a form this size, and it is not
-> reconcilable with NFR-06 (≥ 55 fps on M1, ≥ 30 fps on a Pixel 6a).
+> running the simplex-noise displacement above on every frame.
 >
-> The default is now 48 (20 × 49² = 48,020 triangles), and the render profiles in
-> NFR-07 select `high: 48 · medium: 24 · low: 12`. These are starting points to be
-> measured, not settled values — the profile boundaries should be set from the
-> frame-rate data the capability probe already collects, on real hardware rather
-> than in a container, where WebGL is software-rendered.
+> That count was first flagged from arithmetic alone. It has since been measured,
+> on an Intel HD Graphics 620 through ANGLE/D3D11, rendering this exact shader
+> with GPU work forced to completion each frame and an empty-scene baseline
+> subtracted:
+>
+> | detail | triangles | 1280×720 | 2560×1440 |
+> |---|---|---|---|
+> | 24 | 12,500 | 2.62 ms | 6.67 ms |
+> | 48 | 48,020 | 3.40 ms | 7.92 ms |
+> | 64 | 84,500 | 4.01 ms | 8.33 ms |
+> | *(empty baseline)* | 20 | *2.03 ms* | — |
+>
+> **The arithmetic-based worry was overstated.** Against a 16.67 ms frame budget,
+> detail 64 costs about 2 ms of real GPU time at 1280×720, and even at 2560×1440
+> the whole draw fits in half a frame. Triangle count is not what threatens
+> NFR-06 on desktop-class hardware.
+>
+> **Resolution is.** The same geometry costs roughly 2.3× more at 2560×1440 than
+> at 1280×720, while a 6.8× increase in triangles costs under 1.5 ms. This work
+> is fill-rate bound, not vertex bound, which means **the render profiles should
+> modulate `dpr` first and `detail` second** — the opposite emphasis to the
+> mobile degradation list in §9.
+>
+> The default is nonetheless 48 (20 × 49² = 48,020 triangles), with profiles at
+> `high: 48 · medium: 24 · low: 12`. That is a headroom decision, not a necessity:
+> the measurement isolates the sculpture, while the real frame also carries GSAP,
+> Lenis, React, the grain overlay, the analyser and any post-processing. Visually,
+> 48 and 64 are indistinguishable at this form's screen size.
+>
+> Still unmeasured: mobile GPUs. A Pixel 6a and an iPhone 12 are a different
+> thermal and architectural proposition from a desktop integrated GPU, and the
+> ≥ 30 fps half of NFR-06 rests on them. These figures do not speak for it.
+
+> **Revision note — displacement and signal ramp.** The shader constants above
+> also changed. v1.0 specified `n * (0.18 + uLow * 0.9)` with
+> `smoothstep(-0.1, 0.5, vDisp)`. Rendered against the real analyser output —
+> the baked envelope's low band runs a median of 0.72 — those values displace the
+> surface by roughly **±0.83 on a radius-1.6 form**, over half the radius, which
+> reads as a spike ball rather than a breathing surface. The ramp then saturates
+> across most of it.
+>
+> Measured by sampling rendered pixels at 1280×720, the published values put
+> fully saturated signal yellow across **14.63% of the viewport**. §3.1 rule 1
+> caps the accent at 4%. Body copy laid over the result sits at about 1.1:1
+> against the yellow, so it was also a contrast failure, not only an
+> art-direction one.
+>
+> Recalibrated to `n * (0.05 + uLow * 0.16)` and `smoothstep(0.05, 0.12, vDisp)`,
+> chosen from a sweep against the quietest, median and loudest frames of the
+> envelope:
+>
+> | ramp | quietest | median | loudest |
+> |---|---|---|---|
+> | 0.03 → 0.10 | 1.90% | 4.77% | 6.48% |
+> | 0.04 → 0.11 | 0.97% | 3.47% | 5.09% |
+> | **0.05 → 0.12** | **0.38%** | **2.41%** | **3.85%** |
+> | 0.06 → 0.13 | 0.13% | 1.50% | 2.83% |
+>
+> Only 0.05 → 0.12 holds under 4% at the loudest frame while still showing an
+> accent at the quietest. An accent that marks "the thing currently making sound"
+> has to survive quiet music, so a ramp that vanishes below 0.2% fails the rule
+> in the other direction. The ramp start is now above zero, so only outward
+> displacement lights: the published −0.1 start also tinted inward troughs.
+>
+> These live in `src/lib/webgl/sculptureTuning.ts` with the invariants asserted
+> in its test, so restoring the v1.0 numbers fails the build.
 
 ## 8. Experimental navigation — the mixing desk
 
