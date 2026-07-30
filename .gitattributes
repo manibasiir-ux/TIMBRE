@@ -1,2 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Files consumed by Linux containers must keep LF regardless of host checkout.
+# A CRLF line ending inside a bind-mounted shell script breaks bash.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
