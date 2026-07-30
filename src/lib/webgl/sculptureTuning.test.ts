@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BASE_CAMERA_Z,
   DISPLACEMENT,
   LOUDEST_FRAME,
+  REFERENCE_ASPECT,
   SCULPTURE_RADIUS,
   SIGNAL_RAMP,
+  cameraDistanceForAspect,
   peakDisplacement,
 } from "./sculptureTuning";
 
@@ -62,7 +65,7 @@ describe("signal ramp keeps the accent rationed", () => {
     expect(SIGNAL_RAMP.start).toBeGreaterThanOrEqual(silent);
   });
 
-  it("holds the measured calibration", () => {
+  it("holds the measured signal ramp", () => {
     // Sampled at 1280x720: 0.38% coverage at the quietest frame, 2.41% at the
     // median, 3.85% at the loudest, against the 4% cap in §3.1 rule 1.
     expect(SIGNAL_RAMP).toEqual({ start: 0.05, end: 0.12 });
@@ -72,5 +75,45 @@ describe("signal ramp keeps the accent rationed", () => {
       midGain: 0.03,
       highGain: 0.02,
     });
+  });
+});
+
+describe("camera compensation keeps the calibration true off 16:9", () => {
+  it("leaves the reference aspect untouched", () => {
+    expect(cameraDistanceForAspect(REFERENCE_ASPECT)).toBeCloseTo(
+      BASE_CAMERA_Z,
+      10,
+    );
+  });
+
+  it("pulls back as the viewport narrows", () => {
+    const desktop = cameraDistanceForAspect(1280 / 720);
+    const tablet = cameraDistanceForAspect(768 / 1024);
+    const phone = cameraDistanceForAspect(375 / 812);
+    expect(tablet).toBeGreaterThan(desktop);
+    expect(phone).toBeGreaterThan(tablet);
+  });
+
+  it("never moves closer than the reference on wide viewports", () => {
+    // Pulling in on ultrawide would overfill vertically. §9 widens the field of
+    // view there instead.
+    for (const aspect of [2, 21 / 9, 3440 / 1440, 32 / 9]) {
+      expect(cameraDistanceForAspect(aspect)).toBe(BASE_CAMERA_Z);
+    }
+  });
+
+  it("scales with the square root of the aspect shortfall", () => {
+    // Projected area falls with the square of distance, so halving the aspect
+    // must multiply distance by sqrt(2) to hold area constant.
+    const wide = cameraDistanceForAspect(REFERENCE_ASPECT);
+    const half = cameraDistanceForAspect(REFERENCE_ASPECT / 2);
+    expect(half / wide).toBeCloseTo(Math.SQRT2, 10);
+  });
+
+  it("survives a degenerate aspect rather than producing NaN", () => {
+    // Canvases are measured at zero size for a frame before layout settles.
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(cameraDistanceForAspect(bad)).toBe(BASE_CAMERA_Z);
+    }
   });
 });
