@@ -114,20 +114,25 @@ cd timbre
 npm i gsap lenis three @react-three/fiber @react-three/drei zustand
 npm i -D @types/three prettier prettier-plugin-tailwindcss vitest \
   @vitejs/plugin-react @axe-core/playwright @playwright/test
-npm i resend @vercel/blob @vercel/kv zod react-hook-form @hookform/resolvers
+npm i resend @vercel/blob @upstash/redis @upstash/ratelimit zod react-hook-form @hookform/resolvers
 npm i next-mdx-remote gray-matter
 
 npx playwright install --with-deps chromium webkit
 git init && git add -A && git commit -m "chore: scaffold"
 ```
 
-GSAP's Club plugins (SplitText, ScrollSmoother) install from the private registry:
+> **Revision note — GSAP.** v1.0 installed `@gsap/business` from the private
+> GreenSock registry with a `$GSAP_TOKEN`, on the assumption that SplitText and
+> ScrollSmoother were Club-only. They are not. Since GSAP 3.13 the entire plugin
+> set ships in the public package; verified against the installed tree, where
+> `node_modules/gsap/` contains `SplitText.js`, `ScrollSmoother.js` and
+> `MorphSVGPlugin.js`. Plain `npm i gsap` is sufficient. This removes a paid
+> dependency and a secret from the build, so no registry configuration is needed.
 
-```bash
-npm config set @gsap:registry https://npm.greensock.com
-npm config set //npm.greensock.com/:_authToken $GSAP_TOKEN
-npm i gsap@npm:@gsap/business
-```
+> **Revision note — rate limiting.** v1.0 used `@vercel/kv`, which Vercel has
+> since retired in favour of Marketplace Redis integrations. The dependency list
+> and §6 now target Upstash Redis over HTTP, which works on serverless runtimes
+> and keeps the endpoint deployable unchanged.
 
 `.env.local`:
 
@@ -137,6 +142,8 @@ SLACK_BRIEF_WEBHOOK=https://hooks.slack.com/services/xxx
 TURNSTILE_SECRET_KEY=0x4xxx
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4xxx
 BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxx
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
 NEXT_PUBLIC_SITE_URL=https://timbre.studio
 ```
 
@@ -244,7 +251,9 @@ mm.add('(prefers-reduced-motion: reduce)', () => {
 // src/app/api/brief/route.ts
 import { z } from 'zod'
 import { Resend } from 'resend'
-import { kv } from '@vercel/kv'
+import { Redis } from '@upstash/redis'
+
+const redis = Redis.fromEnv()
 
 const schema = z.object({
   name: z.string().min(2).max(80),
@@ -258,9 +267,12 @@ const schema = z.object({
 })
 
 export async function POST(req: Request) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  const hits = await kv.incr(`brief:${ip}`)
-  if (hits === 1) await kv.expire(`brief:${ip}`, 600)
+  // x-forwarded-for is a client-settable list on most platforms. Take the first
+  // hop only, and treat the value as advisory: it is a spam speed bump sitting
+  // in front of Turnstile, not an authorisation boundary.
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+  const hits = await redis.incr(`brief:${ip}`)
+  if (hits === 1) await redis.expire(`brief:${ip}`, 600)
   if (hits > 5) return Response.json({ error: 'rate_limited' }, { status: 429 })
 
   const data = schema.parse(await req.json())

@@ -84,17 +84,25 @@ All `--text-mono*` tokens render `text-transform: uppercase` and `font-variant-n
 
 | Pair | Ratio | Verdict |
 |---|---|---|
-| `#F4F4F0` on `#0B0B0C` | **18.4:1** | AAA all sizes |
-| `#F4F4F0` @70% on `#0B0B0C` | **9.7:1** | AAA all sizes |
-| `#F4F4F0` @40% on `#0B0B0C` | **3.6:1** | Non-text/decorative only — AA for UI components (3:1), fails for text |
-| `#E8FF2B` on `#0B0B0C` | **15.9:1** | AAA all sizes |
-| `#0B0B0C` on `#E8FF2B` | **15.9:1** | AAA — the signal button |
-| `#F4F4F0` on `#141416` | **17.0:1** | AAA |
-| `#FF4A1F` on `#0B0B0C` | **5.4:1** | AA normal text, AAA large |
-| `#5BE3A5` on `#0B0B0C` | **11.8:1** | AAA |
-| `#E8FF2B` on `#141416` | **14.7:1** | AAA |
+| `#F4F4F0` on `#0B0B0C` | **17.84:1** | AAA all sizes |
+| `#F4F4F0` @70% on `#0B0B0C` | **8.86:1** | AAA all sizes |
+| `#F4F4F0` @40% on `#0B0B0C` | **3.54:1** | Non-text/decorative only — AA for UI components (3:1), fails for text |
+| `#E8FF2B` on `#0B0B0C` | **17.58:1** | AAA all sizes |
+| `#0B0B0C` on `#E8FF2B` | **17.58:1** | AAA — the signal button |
+| `#F4F4F0` on `#141416` | **16.69:1** | AAA |
+| `#FF4A1F` on `#0B0B0C` | **5.86:1** | AA normal text, AAA large |
+| `#5BE3A5` on `#0B0B0C` | **12.16:1** | AAA |
+| `#E8FF2B` on `#141416` | **16.44:1** | AAA |
 
-`--color-ink-40` is prohibited for text. Its 3.6:1 clears the 3:1 threshold for non-text UI components (WCAG 2.2 SC 1.4.11) only.
+`--color-ink-40` is prohibited for text. Its 3.54:1 clears the 3:1 threshold for non-text UI components (WCAG 2.2 SC 1.4.11) only.
+
+> **Revision note.** The ratios above were recomputed from the WCAG 2.2
+> relative-luminance formula and replace the figures carried in v1.0, five of
+> which were wrong by more than rounding — the largest error was 1.74. Every
+> verdict in the third column is unchanged: no pair moved across a compliance
+> threshold, and four pairs clear their threshold by more than v1.0 claimed.
+> These values are asserted in `src/lib/color/contrast.test.ts`, so the table and
+> the shipped palette cannot drift apart again without failing the build.
 
 ## 4. Motion system
 
@@ -238,13 +246,13 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
 
     lenis.on('scroll', ScrollTrigger.update)
 
+    // Lenis drives, the GSAP ticker is the only RAF loop, R3F subscribes to it.
+    // lagSmoothing is disabled so a dropped frame never desynchronises the
+    // scrub position from the scroll position.
     const raf = (time: number) => lenis.raf(time * 1000)
     gsap.ticker.add(raf)
-    gsap.ticker.lagSmoothing(500, 33)
+    gsap.ticker.lagSmoothing(0)
 
-    ScrollTrigger.scrollerProxy(document.body, {
-      scrollTop: (v) => (v !== undefined ? lenis.scrollTo(v, { immediate: true }) : lenis.scroll),
-    })
     ScrollTrigger.refresh()
 
     return () => {
@@ -257,6 +265,26 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 ```
+
+> **Revision note — no scrollerProxy.** v1.0 wrapped `document.body` in a
+> `ScrollTrigger.scrollerProxy`. That call has been removed, for two reasons.
+>
+> It was unnecessary. `scrollerProxy` exists to teach ScrollTrigger how to read a
+> **custom scroll container**. This Lenis instance is given no `wrapper` or
+> `content`, so it transforms native window scrolling and the real document
+> scroll position stays authoritative — ScrollTrigger already reads it correctly.
+> The proxy was also registered against `document.body` while no trigger ever set
+> `scroller: document.body`, so it applied to nothing.
+>
+> It was also wrong. `scrollTop` is a combined getter and setter: called with no
+> argument it must **return** the current position, and it returned
+> `lenis.scrollTo(...)`, a setter whose return value is not a scroll offset. Any
+> trigger that had used the proxy would have had its reads and writes crossed.
+>
+> This is the true cause of risk R4 (RAF contention between Lenis, GSAP and R3F)
+> rather than a mitigation for it. The three lines that remain — the `scroll`
+> listener, the single ticker callback, and `lagSmoothing(0)` — are the whole
+> integration.
 
 ### 7.2 GSAP timeline — hero entrance
 
@@ -383,7 +411,7 @@ const fragment = /* glsl */ `
   }
 `
 
-export function SoundSculpture({ detail = 64, gain = 1 }: { detail?: number; gain?: number }) {
+export function SoundSculpture({ detail = 48, gain = 1 }: { detail?: number; gain?: number }) {
   const mat = useRef<THREE.ShaderMaterial>(null!)
   const mesh = useRef<THREE.Mesh>(null!)
   const { bands } = useAudioAnalyser() // { low, mid, high } 0..1, smoothed
@@ -414,6 +442,19 @@ export function SoundSculpture({ detail = 64, gain = 1 }: { detail?: number; gai
 }
 ```
 
+> **Revision note — geometry density.** v1.0 defaulted `detail` to 64.
+> `IcosahedronGeometry` subdivides each of its 20 faces into `(detail + 1)²`
+> triangles, so 64 is 20 × 65² = **84,500 triangles / 253,500 vertices**, each
+> running the simplex-noise displacement above on every frame. That is far past
+> the point of diminishing visual return for a form this size, and it is not
+> reconcilable with NFR-06 (≥ 55 fps on M1, ≥ 30 fps on a Pixel 6a).
+>
+> The default is now 48 (20 × 49² = 48,020 triangles), and the render profiles in
+> NFR-07 select `high: 48 · medium: 24 · low: 12`. These are starting points to be
+> measured, not settled values — the profile boundaries should be set from the
+> frame-rate data the capability probe already collects, on real hardware rather
+> than in a container, where WebGL is software-rendered.
+
 ## 8. Experimental navigation — the mixing desk
 
 **Resting state.** A 64px master transport bar fixed to the bottom of the viewport: `--color-ground-lift`, 1px `--color-ink-15` top border, `backdrop-filter: blur(16px)`. Left to right — play/pause (36px), a live stereo VU pair (2×4px columns, peak-hold caps in `--color-signal`), the current stem label in `--text-mono-xs`, elapsed/total timecode, a full-width scrub track, a mute toggle, and the desk toggle `≡ DESK`.
@@ -441,7 +482,7 @@ export function SoundSculpture({ detail = 64, gain = 1 }: { detail?: number; gai
 
 **Mobile WebGL degradation:**
 
-1. Icosahedron detail drops `64 → 24`; the GPU point cloud drops from 120,000 to 24,000 points.
+1. Icosahedron detail drops `48 → 24`; the GPU point cloud drops from 120,000 to 24,000 points.
 2. `dpr` clamped to `[1, 1.5]` (desktop `[1, 2]`).
 3. Post-processing (bloom, film grain pass) disabled; grain moves to a CSS overlay.
 4. Camera scrub replaced with three discrete keyframed positions triggered by `toggleActions`.
