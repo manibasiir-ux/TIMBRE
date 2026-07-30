@@ -1,26 +1,255 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ---------------------------------------------------------------------------
+   Design tokens — design specification §2.1, §3, §4.1, §4.2, §5.
+
+   Tailwind v4 declares its theme in CSS, so this block is the theme. Colour
+   values are mirrored in src/lib/color/palette.ts and a test asserts the two
+   copies agree.
+
+   The spacing scale is deliberately absent: specification §5 lists exactly the
+   values Tailwind already derives from its 0.25rem base, so redeclaring them
+   would add drift risk for no gain.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Colour ------------------------------------------------------------- */
+  --color-ground: #0B0B0C;
+  --color-ground-lift: #141416;
+  --color-ground-deep: #050506;
+
+  --color-ink: #F4F4F0;
+  --color-ink-70: rgb(244 244 240 / 0.7);
+  --color-ink-40: rgb(244 244 240 / 0.4);
+  --color-ink-15: rgb(244 244 240 / 0.15);
+
+  --color-signal: #E8FF2B;
+  --color-signal-dim: #8A9A1A;
+  --color-warm-shade: #3A342C;
+  --color-peak: #FF4A1F;
+  --color-ok: #5BE3A5;
+
+  /* Type scale --------------------------------------------------------- */
+  --text-mega: clamp(4rem, 13vw, 15rem);
+  --text-mega--line-height: 0.82;
+  --text-mega--letter-spacing: -0.045em;
+  --text-mega--font-weight: 700;
+
+  --text-display: clamp(3rem, 8.5vw, 8.5rem);
+  --text-display--line-height: 0.88;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 700;
+
+  --text-h1: clamp(2.5rem, 6vw, 5.5rem);
+  --text-h1--line-height: 0.92;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 800;
+
+  --text-h2: clamp(1.875rem, 3.6vw, 3.25rem);
+  --text-h2--line-height: 1;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 800;
+
+  --text-h3: clamp(1.375rem, 2.2vw, 1.875rem);
+  --text-h3--line-height: 1.15;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+
+  --text-lead: clamp(1.125rem, 1.6vw, 1.5rem);
+  --text-lead--line-height: 1.45;
+  --text-lead--letter-spacing: -0.005em;
+  --text-lead--font-weight: 400;
+
+  --text-body: clamp(1rem, 1.05vw, 1.125rem);
+  --text-body--line-height: 1.6;
+  --text-body--letter-spacing: 0;
+  --text-body--font-weight: 400;
+
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5;
+  --text-small--letter-spacing: 0.005em;
+
+  --text-mono: 0.8125rem;
+  --text-mono--line-height: 1.35;
+  --text-mono--letter-spacing: 0.09em;
+  --text-mono--font-weight: 500;
+
+  --text-mono-xs: 0.6875rem;
+  --text-mono-xs--line-height: 1.2;
+  --text-mono-xs--letter-spacing: 0.14em;
+  --text-mono-xs--font-weight: 500;
+
+  /* Easing ------------------------------------------------------------- */
+  --ease-fader: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-transport: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-attack: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-release: cubic-bezier(0.55, 0, 1, 0.45);
+  --ease-detent: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-linear: cubic-bezier(0, 0, 1, 1);
+
+  /* Duration ----------------------------------------------------------- */
+  --dur-tick: 0.12s;
+  --dur-quick: 0.24s;
+  --dur-base: 0.45s;
+  --dur-slow: 0.9s;
+  --dur-cine: 1.4s;
+  --dur-epic: 2.2s;
+
+  /* Layout ------------------------------------------------------------- */
+  --container-shell: 1680px;
+  --gutter: clamp(1.25rem, 4vw, 5rem);
+  --transport-height: 64px;
+  --measure-body: 64ch;
+  --measure-lead: 48ch;
 }
 
+/* Fonts resolve through a second block because next/font defines the face
+   variables at runtime and `inline` lets the theme reference them. The -face
+   suffix keeps next/font's variables from colliding with Tailwind's own
+   --font-* namespace. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display-face), "Arial Black", system-ui, sans-serif;
+  --font-display-alt: var(--font-display-face), "Arial Narrow", system-ui, sans-serif;
+  --font-body: var(--font-body-face), -apple-system, "Helvetica Neue", sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, "SF Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    background-color: var(--color-ground);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100dvh;
+    /* Specification §5: the transport bar occupies a fixed band at the bottom
+       of every viewport, so no page may lay content underneath it. */
+    padding-bottom: calc(var(--transport-height) + env(safe-area-inset-bottom));
+  }
+
+  /* Specification §3.1 rule 6 and §10. Never removed. */
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background-color: var(--color-signal);
+    color: var(--color-ground);
+  }
+
+  /* Every --text-mono* token is uppercase with tabular figures, §2.1. */
+  .text-mono,
+  .text-mono-xs {
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The two display roles are one variable family at opposite ends of its
+     width axis: 125 stands in for Druk Wide, 62 for Druk Condensed. Only wdth
+     is pinned. wght is left out on purpose so the per-token font-weight from
+     the §2.1 type scale keeps driving the weight axis. */
+  .font-display {
+    font-variation-settings: "wdth" 125;
+  }
+
+  .font-display-alt {
+    font-variation-settings: "wdth" 62;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ---------------------------------------------------------------------------
+   Utilities
+--------------------------------------------------------------------------- */
+
+/** Page shell: capped measure with responsive gutters, §5. */
+@utility shell {
+  width: 100%;
+  max-width: var(--container-shell);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/** Vertical section rhythm, §5. */
+@utility section-rhythm {
+  padding-block: clamp(6rem, 14vh, 14rem);
+}
+
+/**
+ * Monochrome film grain, §1. Generated as an SVG turbulence data URI rather
+ * than a bitmap so it costs no request and no binary asset in the repo.
+ */
+@utility grain {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  animation: grain-shift 0.25s steps(3) infinite;
+}
+
+/** Hero-only scanline banding at 2%, §1. */
+@utility scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgb(244 244 240 / 0.02) 0px,
+    rgb(244 244 240 / 0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+@keyframes grain-shift {
+  0% {
+    background-position: 0 0;
+  }
+  33% {
+    background-position: -32px 16px;
+  }
+  66% {
+    background-position: 24px -24px;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion — specification §4.3 rule 6 and §10.
+
+   Treated as an art direction rather than a stripped build: durations collapse
+   to the quick step, and anything whose only job is decoration stops entirely.
+   Elements carrying data-decorative-motion opt into being switched off; state-
+   bearing motion is left alone so no information exists only in movement.
+--------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.2s !important;
+    transition-duration: 0.2s !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-decorative-motion] {
+    animation: none !important;
+  }
 }
