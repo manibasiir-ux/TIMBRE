@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
+import { SceneMount } from "@/components/webgl/SceneMount";
 import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
 
@@ -58,7 +59,13 @@ export default function RootLayout({
           Skip to content
         </a>
 
-        <main id="main">{children}</main>
+        {/* FR-05: mounted once here, never unmounted, so route changes never
+            rebuild the WebGL context. */}
+        <SceneMount />
+
+        <main id="main" className="relative z-10">
+          {children}
+        </main>
 
         {/* Decorative only, and switched off under prefers-reduced-motion. */}
         <div className="grain" data-decorative-motion aria-hidden="true" />
