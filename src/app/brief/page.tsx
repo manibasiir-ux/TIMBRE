@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 
+import { BriefFormMount } from "@/components/brief/BriefFormMount";
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 
 /**
  * Brief us, specification §6.8.
  *
- * The four-step form with its per-step validation, Turnstile, upload and
- * delivery is the next phase. What is here is the surrounding page: what
- * happens after you send, how fast we answer, and a route that does not depend
- * on a form existing at all.
+ * The page around the form is server-rendered; the form itself is the only
+ * client component, so what happens next and how to reach us without a form are
+ * in the initial HTML regardless of whether the form ever hydrates.
  */
 
 export const metadata: Metadata = {
@@ -48,21 +48,7 @@ export default function BriefPage() {
 
       <WaveformRule seed={11} />
 
-      <section className="shell section-rhythm">
-        <div className="border border-ink-15 bg-ground-lift p-8">
-          <p className="font-mono text-mono-xs text-signal">Form in progress</p>
-          <p className="mt-4 max-w-[56ch] text-body text-ink-70">
-            The four-step brief form is being built. Until it lands, email is a
-            perfectly good substitute and reaches the same people.
-          </p>
-          <a
-            href="mailto:new@timbre.studio"
-            className="mt-8 inline-block min-h-11 bg-signal px-8 py-4 font-mono text-mono text-ground"
-          >
-            new@timbre.studio
-          </a>
-        </div>
-      </section>
+      <BriefFormMount />
 
       <section className="shell section-rhythm">
         <h2 className="font-display text-h2 text-ink">What happens next</h2>
