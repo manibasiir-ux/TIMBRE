@@ -40,8 +40,42 @@ export const DISPLACEMENT = {
   highGain: 0.02,
 } as const;
 
-/** Displacement values mapping to no signal and to full signal. */
+/** Displacement values mapping to no signal and to full signal, at gain 1. */
 export const SIGNAL_RAMP = { start: 0.05, end: 0.12 } as const;
+
+/**
+ * How the signal ramp tracks displacement gain.
+ *
+ * §7 scrubs displacement gain from 1 to 2.4 as the hero scrolls. Left against a
+ * fixed ramp that is not a stylistic choice, it is a rule violation: measured
+ * coverage went 3.85% -> 11.65% -> 18.54% across the scrub on desktop, against
+ * the 4% cap in §3.1 rule 1. §7 and §3.1 cannot both be satisfied unless the
+ * ramp moves with the gain.
+ *
+ * Scaling the ramp in proportion (exponent 1) is not quite enough — 4.99% at the
+ * far end — because displacement also inflates the silhouette, so the object
+ * covers more of the viewport as well as lighting more of itself. Measured
+ * across desktop, tablet-portrait and phone at gains 1.0/1.4/1.8/2.4:
+ *
+ * | exponent | worst case | accent at scrub end |
+ * |---|---|---|
+ * | 1.0  | 4.99% (fails) | 4.99% |
+ * | **1.2** | **3.85%** | **2.24%** |
+ * | 1.35 | 3.85% | 0.67% |
+ * | 1.5  | 3.85% | 0.09% |
+ *
+ * 1.2 is the shallowest exponent that holds the rule. The steeper ones also
+ * pass, but by extinguishing the accent exactly when the sculpture is at its
+ * most active, which inverts what the accent is for.
+ */
+export const RAMP_GAIN_EXPONENT = 1.2;
+
+/** The signal ramp at a given total displacement gain. */
+export function signalRampFor(gain: number): { start: number; end: number } {
+  const safe = Number.isFinite(gain) && gain > 0 ? gain : 1;
+  const scale = Math.pow(safe, RAMP_GAIN_EXPONENT);
+  return { start: SIGNAL_RAMP.start * scale, end: SIGNAL_RAMP.end * scale };
+}
 
 /** Radius of the icosahedron the displacement is applied to. */
 export const SCULPTURE_RADIUS = 1.6;

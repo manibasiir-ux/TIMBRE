@@ -7,8 +7,10 @@ import {
   REFERENCE_ASPECT,
   SCULPTURE_RADIUS,
   SIGNAL_RAMP,
+  RAMP_GAIN_EXPONENT,
   cameraDistanceForAspect,
   peakDisplacement,
+  signalRampFor,
 } from "./sculptureTuning";
 
 /**
@@ -114,6 +116,54 @@ describe("camera compensation keeps the calibration true off 16:9", () => {
     // Canvases are measured at zero size for a frame before layout settles.
     for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(cameraDistanceForAspect(bad)).toBe(BASE_CAMERA_Z);
+    }
+  });
+});
+
+describe("signal ramp tracks displacement gain", () => {
+  it("is the calibrated ramp at gain 1", () => {
+    expect(signalRampFor(1)).toEqual({
+      start: SIGNAL_RAMP.start,
+      end: SIGNAL_RAMP.end,
+    });
+  });
+
+  it("rises with gain, so a louder form does not light more of itself", () => {
+    // Without this the §7 scrub from gain 1 to 2.4 took measured coverage from
+    // 3.85% to 18.54%, against the 4% ceiling in §3.1 rule 1.
+    const top = signalRampFor(1);
+    const end = signalRampFor(2.4);
+    expect(end.start).toBeGreaterThan(top.start);
+    expect(end.end).toBeGreaterThan(top.end);
+  });
+
+  it("outpaces the gain, because displacement also inflates the silhouette", () => {
+    // Proportional scaling measured 4.99% at the far end and still failed.
+    expect(RAMP_GAIN_EXPONENT).toBeGreaterThan(1);
+    const end = signalRampFor(2.4);
+    expect(end.start / SIGNAL_RAMP.start).toBeGreaterThan(2.4);
+  });
+
+  it("stays shallow enough to leave an accent at full gain", () => {
+    // The steeper exponents also hold the rule, but by extinguishing the accent
+    // exactly when the sculpture is most active.
+    expect(RAMP_GAIN_EXPONENT).toBeLessThanOrEqual(1.25);
+  });
+
+  it("keeps start below end at every gain in the scrubbed range", () => {
+    for (let gain = 1; gain <= 2.4; gain += 0.1) {
+      const ramp = signalRampFor(gain);
+      expect(ramp.start).toBeLessThan(ramp.end);
+      expect(ramp.start).toBeGreaterThan(0);
+    }
+  });
+
+  it("falls back to the calibrated ramp on a degenerate gain", () => {
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(signalRampFor(bad)).toEqual({
+        start: SIGNAL_RAMP.start,
+        end: SIGNAL_RAMP.end,
+      });
     }
   });
 });

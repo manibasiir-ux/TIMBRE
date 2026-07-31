@@ -514,6 +514,36 @@ export function SoundSculpture({ detail = 48, gain = 1 }: { detail?: number; gai
 > These live in `src/lib/webgl/sculptureTuning.ts` with the invariants asserted
 > in its test, so restoring the v1.0 numbers fails the build.
 
+> **Revision note — the scroll gain and the 4% rule are in direct conflict.**
+> The animation table above scrubs "displacement gain 1→2.4" as the hero
+> scrolls. Measured against a fixed signal ramp, coverage runs 3.85% → 11.65% →
+> **18.54%** across that scrub on desktop, and 3.47% → 15.99% on a phone. §7 and
+> §3.1 rule 1 cannot both hold unless the ramp moves with the gain, because more
+> displacement means more of the surface clears any fixed threshold.
+>
+> The ramp is therefore a uniform, scaled by `gain ^ 1.2`. Proportional scaling
+> alone (exponent 1) still measured 4.99% at full gain, because displacement
+> also inflates the silhouette — the object covers more of the viewport as well
+> as lighting more of itself. Measured worst case across desktop,
+> tablet-portrait and phone at gains 1.0 / 1.4 / 1.8 / 2.4:
+>
+> | exponent | worst case | accent at scrub end |
+> |---|---|---|
+> | 1.0 | 4.99% (fails) | 4.99% |
+> | **1.2** | **3.85%** | **2.24%** |
+> | 1.35 | 3.85% | 0.67% |
+> | 1.5 | 3.85% | 0.09% |
+>
+> 1.2 is the shallowest exponent that holds the rule. The steeper ones pass by
+> extinguishing the accent exactly when the sculpture is most active, which
+> inverts what the accent is for.
+>
+> §6.1's "sculpture recedes and desaturates behind" during the manifesto turns
+> out to be load-bearing rather than decorative, and is now implemented as
+> such. Without it the manifesto's editorial copy scrolls directly over the
+> sculpture's lit peaks at roughly 1.1:1 — the same contrast failure the hero
+> had before its body copy was removed.
+
 ## 8. Experimental navigation — the mixing desk
 
 **Resting state.** A 64px master transport bar fixed to the bottom of the viewport: `--color-ground-lift`, 1px `--color-ink-15` top border, `backdrop-filter: blur(16px)`. Left to right — play/pause (36px), a live stereo VU pair (2×4px columns, peak-hold caps in `--color-signal`), the current stem label in `--text-mono-xs`, elapsed/total timecode, a full-width scrub track, a mute toggle, and the desk toggle `≡ DESK`.

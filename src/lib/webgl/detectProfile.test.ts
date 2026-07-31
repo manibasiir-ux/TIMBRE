@@ -3,11 +3,24 @@ import { describe, expect, it } from "vitest";
 import {
   type Capabilities,
   FrameRateMonitor,
+  MIN_SAMPLES,
   PROFILE_SETTINGS,
+  STALL_THRESHOLD_MS,
   isSoftwareRenderer,
   selectProfile,
   stepDown,
 } from "./detectProfile";
+
+/** Feeds `count` frames of exactly `deltaMs`, returning true if it fired. */
+function feedFrames(
+  monitor: FrameRateMonitor,
+  deltaMs: number,
+  count: number,
+) {
+  let fired = false;
+  for (let i = 0; i < count; i += 1) fired = monitor.push(deltaMs) || fired;
+  return fired;
+}
 
 const CAPABLE: Capabilities = {
   webgl2: true,
@@ -171,5 +184,46 @@ describe("FrameRateMonitor", () => {
     feed(monitor, 20, 10);
     monitor.reset();
     expect(feed(monitor, 60, 1)).toBe(false);
+  });
+});
+
+describe("FrameRateMonitor tolerates stalls", () => {
+  it("does not degrade a healthy machine because of one long first frame", () => {
+    // The Phase 5 regression: with frameloop="never" the clock starts before
+    // the first advance, so frame one spans hundreds of milliseconds. That
+    // single sample used to drag a window of 16ms frames under the threshold.
+    const monitor = new FrameRateMonitor();
+    expect(monitor.push(820)).toBe(false);
+    expect(feedFrames(monitor, 16, 400)).toBe(false);
+  });
+
+  it("discards the window on a stall rather than counting it", () => {
+    const monitor = new FrameRateMonitor();
+    feedFrames(monitor, 16, 100);
+    expect(monitor.push(STALL_THRESHOLD_MS + 1)).toBe(false);
+    // Window restarted, so a verdict needs a fresh full window.
+    expect(feedFrames(monitor, 16, 10)).toBe(false);
+  });
+
+  it("still catches sustained slowness", () => {
+    const monitor = new FrameRateMonitor();
+    // 40ms frames are 25fps: genuinely below the 45fps floor, and plausible.
+    expect(feedFrames(monitor, 40, 200)).toBe(true);
+  });
+
+  it("waits for enough samples before concluding", () => {
+    // A window can be filled by very few very long frames. Those are stalls in
+    // aggregate, not a measurement.
+    const monitor = new FrameRateMonitor();
+    const justUnderStall = STALL_THRESHOLD_MS - 1;
+    const enoughToFillWindow = Math.ceil(3000 / justUnderStall);
+    expect(enoughToFillWindow).toBeLessThan(MIN_SAMPLES);
+    expect(feedFrames(monitor, justUnderStall, enoughToFillWindow)).toBe(false);
+  });
+
+  it("recovers and can still fire after a stall", () => {
+    const monitor = new FrameRateMonitor();
+    monitor.push(5000);
+    expect(feedFrames(monitor, 40, 200)).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import {
   createBands,
   smoothBandsInto,
 } from "./bands";
+import { onTick } from "@/lib/motion/ticker";
 import envelope from "@/data/fft-envelope.json";
 
 /**
@@ -60,11 +61,13 @@ export function useAudioAnalyser() {
 
   useEffect(() => {
     const target = createBands(0);
-    let frame = 0;
     let start: number | null = null;
 
-    const tick = (time: number) => {
-      if (start === null) start = time;
+    // Subscribed to the shared ticker rather than requestAnimationFrame: R4
+    // wants exactly one frame loop, and the bands the sculpture reads must come
+    // from the same timestamp that rendered it.
+    return onTick((_deltaMs, timeSeconds) => {
+      if (start === null) start = timeSeconds;
 
       if (audioEngine.isInitialised) {
         const data = audioEngine.getFrequencyData();
@@ -73,15 +76,11 @@ export function useAudioAnalyser() {
         target.mid = next.mid;
         target.high = next.high;
       } else {
-        sampleEnvelope(baked, (time - start) / 1000, target);
+        sampleEnvelope(baked, timeSeconds - start, target);
       }
 
       smoothBandsInto(bands.current, target);
-      frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    });
   }, []);
 
   return { bands };
