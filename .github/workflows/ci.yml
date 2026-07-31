@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A run that is superseded is a run nobody will read.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deliberately the same container the project is developed in, rather
+      # than setup-node. The working agreement is that every TIMBRE command
+      # runs in Docker; CI running something different would mean CI is not
+      # testing what anyone actually runs, and "works on my machine" would
+      # become "works in CI" instead of going away.
+      - name: Build the image
+        run: docker compose build cli
+
+      - name: Install dependencies
+        run: docker compose run --rm cli "npm ci --no-audit --no-fund"
+
+      - name: Verify
+        run: docker compose run --rm cli "npm run verify"

@@ -37,6 +37,41 @@ Fallback stacks: `"Druk Wide", "Arial Black", system-ui, sans-serif` · `"Söhne
 
 Loading: self-hosted WOFF2, subset to Latin + punctuation, `font-display: swap`, preloaded for Druk Wide Bold and Söhne Buch only. Total font payload budget: **96 KB**.
 
+> **Revision note — the 96 KB budget is unreachable with the stand-in faces.**
+> Measured in the browser, the three families actually downloaded total
+> **165.9 KB**, which is 69.9 KB over:
+>
+> | face | role | downloaded |
+> |---|---|---|
+> | Archivo variable (`wght` + `wdth`) | display, both widths | 88.0 KB |
+> | Inter variable | body | 47.3 KB |
+> | JetBrains Mono variable | data and labels | 30.6 KB |
+>
+> This is not slack that can be trimmed. Archivo's 88 KB buys the width axis
+> that reproduces the Druk Wide ↔ Druk Condensed relationship with one family;
+> dropping it loses the pairing. Google serves Inter and JetBrains Mono as
+> variable fonts only, so pinning weights to the two each role uses does not
+> shrink the file. Loudness of intent aside, there is no lever here.
+>
+> The budget assumed what this line says: **self-hosted WOFF2 subset to Latin
+> plus punctuation**. A variable font carries its entire design space and
+> Google's "latin" subset is far wider than "Latin + punctuation", so the
+> measured figure and the budget are not measuring the same thing. Two routes
+> back into compliance, both real:
+>
+> 1. **Licensed static faces, hand-subset.** Druk Wide Bold, Druk Condensed
+>    Super and two Söhne weights, subset to the glyphs the site uses, land
+>    comfortably inside 96 KB. This is what the budget was written against.
+> 2. **Subset the stand-ins.** `fonttools` in the container, cutting each
+>    variable font to the required glyph range. Adds a build dependency and a
+>    generation step, and would be thrown away when the licensed faces arrive.
+>
+> Until one is taken, the site ships 69.9 KB over this budget. It is stated here
+> rather than left as a quiet miss, because `font-display: swap` means text
+> paints immediately in the fallback and the overage costs total weight rather
+> than time to first paint — which makes it exactly the kind of number that
+> goes unnoticed.
+
 ### 2.1 Scale
 
 | Token | Element | `clamp()` | Weight | Tracking | Line-height |
