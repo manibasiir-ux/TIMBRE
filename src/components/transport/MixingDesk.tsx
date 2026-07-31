@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SECTIONS, channelNumber, faderValueText } from "@/lib/sections";
@@ -242,12 +243,18 @@ export function MixingDesk({
               </div>
 
               {section.available ? (
-                <a
+                // Next's Link, not a bare anchor. A plain href triggers a full
+                // document load, which tears down and rebuilds the WebGL
+                // context — FR-05 requires the canvas to survive every
+                // client-side route change, and the desk is the primary way
+                // people move between routes.
+                <Link
                   href={section.href}
+                  onClick={close}
                   className="shrink-0 font-mono text-mono-xs text-signal underline-offset-4 hover:underline"
                 >
                   Go
-                </a>
+                </Link>
               ) : (
                 <span className="shrink-0 font-mono text-mono-xs text-ink-40">
                   Soon

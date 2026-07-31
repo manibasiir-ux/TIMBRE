@@ -4,6 +4,7 @@ import { SmoothScroll } from "@/app/providers/SmoothScroll";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { SceneMount } from "@/components/webgl/SceneMount";
+import { SculptureRouteState } from "@/components/webgl/SculptureRouteState";
 import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
 
@@ -65,6 +66,7 @@ export default function RootLayout({
         {/* FR-05: mounted once here, never unmounted, so route changes never
             rebuild the WebGL context. */}
         <SceneMount />
+        <SculptureRouteState />
 
         <SmoothScroll>
           <main id="main" className="relative z-10">

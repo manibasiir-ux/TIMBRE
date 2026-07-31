@@ -4,6 +4,7 @@ import { PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { caseBySlug } from "@/content/cases";
 import { onTick } from "@/lib/motion/ticker";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import {
@@ -137,8 +138,9 @@ export default function SceneRoot() {
   const driveFromTicker = documentVisible && !reducedMotion;
   const frameloop = reducedMotion && documentVisible ? "demand" : "never";
 
+  // The store holds a slug; a screen reader should hear the client's name.
   const description = activeCase
-    ? `Abstract sound sculpture reacting to the ${activeCase} sonic identity.`
+    ? `Abstract sound sculpture reacting to the ${caseBySlug(activeCase)?.client ?? activeCase} sonic identity.`
     : "Abstract sound sculpture reacting to the TIMBRE showreel.";
 
   return (
