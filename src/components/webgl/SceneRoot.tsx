@@ -4,6 +4,8 @@ import { PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { caseBySlug } from "@/content/cases";
+import { onTick } from "@/lib/motion/ticker";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import {
   FrameRateMonitor,
@@ -55,6 +57,26 @@ function ResponsiveCamera() {
       : BASE_CAMERA_Z;
 
   return <PerspectiveCamera makeDefault fov={42} position={[0, 0, distance]} />;
+}
+
+/**
+ * Hands the render loop to the shared ticker, risk R4.
+ *
+ * The canvas runs with frameloop="never" and is advanced from the same clock
+ * that drives Lenis and GSAP, so scroll position, timeline progress and what is
+ * on screen are all resolved from one timestamp. Left on its own loop, R3F
+ * would render at a slightly different moment from the scrub that positions it,
+ * which is the jitter the roadmap describes chasing for a week.
+ */
+function TickerBridge() {
+  const advance = useThree((state) => state.advance);
+
+  useEffect(
+    () => onTick((_deltaMs, timeSeconds) => advance(timeSeconds * 1000)),
+    [advance],
+  );
+
+  return null;
 }
 
 function PerformanceGuard({ onDegrade }: { onDegrade: () => void }) {
@@ -109,16 +131,16 @@ export default function SceneRoot() {
 
   const settings = PROFILE_SETTINGS[profile];
 
-  // Reduced motion renders one frame and then only on demand: the pose is fixed,
-  // so a continuous loop would cost power to redraw an identical image.
-  const frameloop = !documentVisible
-    ? "never"
-    : reducedMotion
-      ? "demand"
-      : "always";
+  // "never" is not "stopped": with motion enabled the TickerBridge below
+  // advances the canvas from the shared clock. Reduced motion renders on demand
+  // instead, because the pose is fixed and a loop would redraw an identical
+  // image. A hidden tab gets neither (E9).
+  const driveFromTicker = documentVisible && !reducedMotion;
+  const frameloop = reducedMotion && documentVisible ? "demand" : "never";
 
+  // The store holds a slug; a screen reader should hear the client's name.
   const description = activeCase
-    ? `Abstract sound sculpture reacting to the ${activeCase} sonic identity.`
+    ? `Abstract sound sculpture reacting to the ${caseBySlug(activeCase)?.client ?? activeCase} sonic identity.`
     : "Abstract sound sculpture reacting to the TIMBRE showreel.";
 
   return (
@@ -147,7 +169,8 @@ export default function SceneRoot() {
           detail={settings.detail}
           reducedMotion={reducedMotion}
         />
-        {!reducedMotion && <PerformanceGuard onDegrade={degrade} />}
+        {driveFromTicker && <TickerBridge />}
+        {driveFromTicker && <PerformanceGuard onDegrade={degrade} />}
       </Canvas>
 
       {/* Hero vignette, the role §3 assigns to --color-ground-deep. Settles the

@@ -9,10 +9,11 @@ import { SMOOTHING, lerp } from "@/lib/audio/bands";
 import { useAudioAnalyser } from "@/lib/audio/useAudioAnalyser";
 import { PALETTE } from "@/lib/color/palette";
 import { SNOISE } from "@/lib/glsl/snoise";
+import { recedeState, sculptureMotion } from "@/lib/motion/sculptureMotion";
 import {
   DISPLACEMENT,
   SCULPTURE_RADIUS,
-  SIGNAL_RAMP,
+  signalRampFor,
 } from "@/lib/webgl/sculptureTuning";
 
 /**
@@ -56,17 +57,21 @@ const vertexShader = /* glsl */ `
   }
 `;
 
+// The ramp is a uniform rather than a constant because it has to track the
+// scroll-linked displacement gain; see signalRampFor.
 const fragmentShader = /* glsl */ `
   precision highp float;
 
   uniform vec3 uBase;
   uniform vec3 uSignal;
   uniform float uMix;
+  uniform float uRampStart;
+  uniform float uRampEnd;
 
   varying float vDisp;
 
   void main() {
-    float t = smoothstep(${SIGNAL_RAMP.start}, ${SIGNAL_RAMP.end}, vDisp);
+    float t = smoothstep(uRampStart, uRampEnd, vDisp);
     vec3 c = mix(uBase, uSignal, t * uMix);
     gl_FragColor = vec4(c, 1.0);
   }
@@ -105,9 +110,13 @@ export function SoundSculpture({
       uBase: { value: new THREE.Color(PALETTE.groundLift) },
       uSignal: { value: new THREE.Color(PALETTE.signal) },
       uMix: { value: 1 },
+      uRampStart: { value: signalRampFor(gain).start },
+      uRampEnd: { value: signalRampFor(gain).end },
     }),
     [gain, reducedMotion],
   );
+
+  const idleRotation = useRef(0);
 
   useFrame((_, delta) => {
     if (reducedMotion) return;
@@ -117,14 +126,35 @@ export function SoundSculpture({
 
     // Clamped because a backgrounded tab can deliver one enormous delta on
     // resume, which would jump the noise field and read as a glitch.
-    u.uTime.value += Math.min(delta, 0.1);
+    const step = Math.min(delta, 0.1);
+    u.uTime.value += step;
 
     const current = bands.current;
     u.uLow.value = lerp(u.uLow.value, current.low, SMOOTHING.low);
     u.uMid.value = lerp(u.uMid.value, current.mid, SMOOTHING.mid);
     u.uHigh.value = lerp(u.uHigh.value, current.high, SMOOTHING.high);
 
-    if (mesh.current) mesh.current.rotation.y += delta * 0.06;
+    // Scroll drives displacement gain and orbit, §7. Read from a plain object
+    // written by ScrollTrigger, so a scrub frame costs no React work.
+    const totalGain = gain * sculptureMotion.gain;
+    u.uGain.value = totalGain;
+
+    // The ramp has to move with the gain, or the accent grows with the
+    // displacement and breaks the 4% ceiling partway down the hero.
+    const ramp = signalRampFor(totalGain);
+    u.uRampStart.value = ramp.start;
+    u.uRampEnd.value = ramp.end;
+
+    // §6.1: recede and desaturate behind the manifesto, so editorial copy is
+    // never laid over a lit peak.
+    const receded = recedeState(sculptureMotion.recede);
+    u.uMix.value = receded.mix;
+
+    if (mesh.current) {
+      idleRotation.current += step * 0.06;
+      mesh.current.rotation.y = idleRotation.current + sculptureMotion.orbit;
+      mesh.current.scale.setScalar(receded.scale);
+    }
   });
 
   return (

@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 
+import { SmoothScroll } from "@/app/providers/SmoothScroll";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { SceneMount } from "@/components/webgl/SceneMount";
+import { SculptureRouteState } from "@/components/webgl/SculptureRouteState";
 import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
 
@@ -64,10 +66,16 @@ export default function RootLayout({
         {/* FR-05: mounted once here, never unmounted, so route changes never
             rebuild the WebGL context. */}
         <SceneMount />
+        <SculptureRouteState />
 
-        <main id="main" className="relative z-10">
-          {children}
-        </main>
+        <SmoothScroll>
+          {/* tabIndex -1 so focus can be moved here programmatically when the
+              consent gate closes and on route changes, without adding it to the
+              tab order. */}
+          <main id="main" tabIndex={-1} className="relative z-10 outline-none">
+            {children}
+          </main>
+        </SmoothScroll>
 
         {/* FR-06: persistent on every route, occupying the band the body has
             reserved since the token layer. */}

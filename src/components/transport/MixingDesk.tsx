@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { focusAfterCommit } from "@/lib/focusAfterCommit";
 import { SECTIONS, channelNumber, faderValueText } from "@/lib/sections";
 import { scrollToProgress } from "@/lib/useScrollProgress";
 import { useExperience } from "@/store/useExperience";
@@ -44,7 +46,7 @@ export function MixingDesk({
 
   const close = useCallback(() => {
     setDeskOpen(false);
-    returnFocusTo.current?.focus();
+    focusAfterCommit(() => returnFocusTo.current);
   }, [setDeskOpen, returnFocusTo]);
 
   useEffect(() => {
@@ -95,10 +97,12 @@ export function MixingDesk({
   const moveFocus = (from: number, delta: number) => {
     const next = Math.min(SECTIONS.length - 1, Math.max(0, from + delta));
     setFocusedIndex(next);
-    const strips = panel.current?.querySelectorAll<HTMLElement>(
-      '[role="slider"]',
+    // Roving tabindex leaves the target at tabindex="-1" until this render
+    // lands, so the focus has to wait for the commit.
+    focusAfterCommit(
+      () =>
+        panel.current?.querySelectorAll<HTMLElement>('[role="slider"]')?.[next],
     );
-    strips?.[next]?.focus();
   };
 
   const commit = (value: number) => {
@@ -181,13 +185,13 @@ export function MixingDesk({
 
           return (
             <li key={section.id} className="shell flex items-center gap-6 py-4">
-              <span className="w-8 shrink-0 font-mono text-mono-xs text-ink-40">
+              <span className="w-8 shrink-0 font-mono text-mono-xs text-ink-70">
                 {channelNumber(index)}
               </span>
 
               <span
                 className={`w-40 shrink-0 font-body text-h3 ${
-                  section.available ? "text-ink" : "text-ink-40"
+                  section.available ? "text-ink" : "text-ink-70"
                 }`}
               >
                 {section.label}
@@ -242,14 +246,20 @@ export function MixingDesk({
               </div>
 
               {section.available ? (
-                <a
+                // Next's Link, not a bare anchor. A plain href triggers a full
+                // document load, which tears down and rebuilds the WebGL
+                // context — FR-05 requires the canvas to survive every
+                // client-side route change, and the desk is the primary way
+                // people move between routes.
+                <Link
                   href={section.href}
+                  onClick={close}
                   className="shrink-0 font-mono text-mono-xs text-signal underline-offset-4 hover:underline"
                 >
                   Go
-                </a>
+                </Link>
               ) : (
-                <span className="shrink-0 font-mono text-mono-xs text-ink-40">
+                <span className="shrink-0 font-mono text-mono-xs text-ink-70">
                   Soon
                 </span>
               )}

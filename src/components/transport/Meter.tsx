@@ -8,6 +8,7 @@ import {
   envelopeStep,
   stereoSpread,
 } from "@/lib/audio/meterEnvelope";
+import { onTick } from "@/lib/motion/ticker";
 
 /**
  * The stereo VU pair, specification §8.
@@ -26,8 +27,6 @@ export function Meter({ active }: { active: boolean }) {
   const rightCap = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    let frame = 0;
-    let previous = performance.now();
     let levelL = 0;
     let levelR = 0;
     const peakL = new PeakHold();
@@ -43,10 +42,8 @@ export function Meter({ active }: { active: boolean }) {
       if (cap) cap.style.transform = `translateY(${-peak * 100}%)`;
     };
 
-    const tick = (now: number) => {
-      const delta = now - previous;
-      previous = now;
-
+    // Shared ticker, not requestAnimationFrame: see lib/motion/ticker.
+    return onTick((delta) => {
       const source = active ? audioEngine.getLevel() : 0;
       const [targetL, targetR] = stereoSpread(source);
 
@@ -60,12 +57,7 @@ export function Meter({ active }: { active: boolean }) {
         levelR,
         peakR.update(levelR, delta),
       );
-
-      frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    });
   }, [active]);
 
   return (

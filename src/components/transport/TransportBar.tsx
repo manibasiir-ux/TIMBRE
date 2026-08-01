@@ -146,7 +146,7 @@ export function TransportBar() {
             {stemLabel}
           </span>
 
-          <span className="shrink-0 font-mono text-mono-xs text-ink-40 tabular-nums">
+          <span className="shrink-0 font-mono text-mono-xs text-ink-70 tabular-nums">
             {timecode(elapsed)} / {timecode(duration)}
           </span>
 

@@ -216,6 +216,23 @@
   );
 }
 
+/* §7: invalid submit shakes the step by 6px, three times, over 0.3s. */
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  16%,
+  50%,
+  83% {
+    transform: translateX(-6px);
+  }
+  33%,
+  66% {
+    transform: translateX(6px);
+  }
+}
+
 @keyframes grain-shift {
   0% {
     background-position: 0 0;

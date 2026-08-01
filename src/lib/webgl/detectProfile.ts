@@ -132,8 +132,28 @@ export function detectProfile(): RenderProfile {
 }
 
 /**
+ * A frame longer than this is a stall, not a slow frame.
+ *
+ * Nothing renders at 4 fps and then recovers: gaps this size come from the tab
+ * being backgrounded, the clock starting before the first frame is drawn, a
+ * garbage collection pause or a debugger break. Feeding one into the rolling
+ * mean makes a healthy machine look like a failing one — a single 500ms outlier
+ * drags a 3s window of 16ms frames under the threshold on its own, which is
+ * exactly how this monitor spent Phase 5 degrading a working canvas to the
+ * video fallback on every page load.
+ */
+export const STALL_THRESHOLD_MS = 250;
+
+/** Samples required before the window is allowed to conclude anything. */
+export const MIN_SAMPLES = 30;
+
+/**
  * Frame-rate step-down, FR-11 and edge case E5. Feed it frame durations; it
  * reports when the rolling mean over `windowMs` drops below `minFps`.
+ *
+ * Sustained slowness is what this is looking for, so it is deliberately hard to
+ * trip: a stall discards the window rather than counting toward it, and no
+ * verdict is reached until the window holds enough frames to be a fair sample.
  */
 export class FrameRateMonitor {
   private samples: number[] = [];
@@ -142,11 +162,19 @@ export class FrameRateMonitor {
   constructor(
     private readonly windowMs = 3000,
     private readonly minFps = 45,
+    private readonly stallThresholdMs = STALL_THRESHOLD_MS,
   ) {}
 
   /** @param deltaMs milliseconds since the previous frame. */
   push(deltaMs: number): boolean {
     if (deltaMs <= 0) return false;
+
+    // A stall says nothing about rendering speed, and the frames either side of
+    // it are no longer a contiguous sample, so the window starts over.
+    if (deltaMs > this.stallThresholdMs) {
+      this.reset();
+      return false;
+    }
 
     this.samples.push(deltaMs);
     this.elapsed += deltaMs;
@@ -163,6 +191,7 @@ export class FrameRateMonitor {
     }
 
     if (this.elapsed < this.windowMs) return false;
+    if (this.samples.length < MIN_SAMPLES) return false;
 
     const meanDelta = this.elapsed / this.samples.length;
     return 1000 / meanDelta < this.minFps;

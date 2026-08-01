@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { focusAfterCommit } from "@/lib/focusAfterCommit";
 import { useExperience } from "@/store/useExperience";
 
 /**
@@ -64,6 +65,20 @@ export function ConsentGate() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [consent]);
 
+  /**
+   * Hands focus to the content once a choice is made.
+   *
+   * Removing the dialog leaves the browser's sequential-focus starting point
+   * where the dialog was — near the end of the document, since the gate renders
+   * after main. A keyboard user's next Tab then goes somewhere arbitrary rather
+   * than to the skip link. §10 moves focus deliberately on a route change; a
+   * mode ending is the same situation.
+   */
+  const decide = (action: () => void) => {
+    action();
+    focusAfterCommit(() => document.getElementById("main"));
+  };
+
   if (consent !== "pending") return null;
 
   return (
@@ -86,7 +101,7 @@ export function ConsentGate() {
         <button
           ref={playButton}
           type="button"
-          onClick={() => void grantConsent()}
+          onClick={() => decide(() => void grantConsent())}
           className="min-h-11 bg-signal px-8 py-4 font-mono text-mono text-ground transition-opacity duration-[var(--dur-quick)] hover:opacity-90"
         >
           ▶ Play the room
@@ -94,7 +109,7 @@ export function ConsentGate() {
 
         <button
           type="button"
-          onClick={declineConsent}
+          onClick={() => decide(declineConsent)}
           className="min-h-11 border border-ink-15 px-8 py-4 font-mono text-mono text-ink transition-colors duration-[var(--dur-quick)] hover:border-ink-40"
         >
           Stay silent
