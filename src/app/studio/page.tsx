@@ -58,7 +58,7 @@ export default function StudioPage() {
                 aria-hidden="true"
               />
               <p className="mt-4 font-body text-h3 text-ink">{person.name}</p>
-              <p className="mt-1 font-mono text-mono-xs text-ink-40">
+              <p className="mt-1 font-mono text-mono-xs text-ink-70">
                 {person.role}
               </p>
             </li>

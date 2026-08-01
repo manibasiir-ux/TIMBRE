@@ -13,7 +13,7 @@ import { WaveformRule } from "@/components/primitives/WaveformRule";
 export default function NotFound() {
   return (
     <section className="shell flex min-h-dvh flex-col justify-center">
-      <p className="font-mono text-mono-xs text-ink-40">Error 404</p>
+      <p className="font-mono text-mono-xs text-ink-70">Error 404</p>
 
       <h1 className="mt-8 font-display text-mega text-ink">Dead channel</h1>
 

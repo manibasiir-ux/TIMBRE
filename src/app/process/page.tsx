@@ -115,19 +115,19 @@ export default function ProcessPage() {
               <tr className="border-b border-ink-15">
                 <th
                   scope="col"
-                  className="py-3 font-mono text-mono-xs text-ink-40"
+                  className="py-3 font-mono text-mono-xs text-ink-70"
                 >
                   Platform
                 </th>
                 <th
                   scope="col"
-                  className="py-3 font-mono text-mono-xs text-ink-40"
+                  className="py-3 font-mono text-mono-xs text-ink-70"
                 >
                   Format
                 </th>
                 <th
                   scope="col"
-                  className="py-3 font-mono text-mono-xs text-ink-40"
+                  className="py-3 font-mono text-mono-xs text-ink-70"
                 >
                   Target
                 </th>

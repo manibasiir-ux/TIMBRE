@@ -34,7 +34,7 @@ const FIELD_CLASS =
   "peer w-full border-0 border-b border-ink-15 bg-transparent pt-6 pb-2 text-body text-ink outline-none transition-[border-color,border-width] duration-[var(--dur-quick)] focus:border-b-2 focus:border-signal placeholder:text-transparent";
 
 const LABEL_CLASS =
-  "pointer-events-none absolute left-0 top-6 origin-left font-mono text-mono-xs text-ink-40 transition-transform duration-[var(--dur-quick)] ease-[var(--ease-fader)] peer-focus:-translate-y-[18px] peer-focus:scale-75 peer-focus:text-signal peer-[:not(:placeholder-shown)]:-translate-y-[18px] peer-[:not(:placeholder-shown)]:scale-75";
+  "pointer-events-none absolute left-0 top-6 origin-left font-mono text-mono-xs text-ink-70 transition-transform duration-[var(--dur-quick)] ease-[var(--ease-fader)] peer-focus:-translate-y-[18px] peer-focus:scale-75 peer-focus:text-signal peer-[:not(:placeholder-shown)]:-translate-y-[18px] peer-[:not(:placeholder-shown)]:scale-75";
 
 function Field({
   id,
@@ -268,7 +268,7 @@ export function BriefForm() {
         >
           {current.title}
         </p>
-        <p className="font-mono text-mono-xs text-ink-40 tabular-nums">
+        <p className="font-mono text-mono-xs text-ink-70 tabular-nums">
           Step {String(step + 1).padStart(2, "0")} /{" "}
           {String(STEPS.length).padStart(2, "0")}
         </p>
@@ -286,7 +286,7 @@ export function BriefForm() {
       </div>
 
       {restored && step === 0 && (
-        <p className="mt-6 font-mono text-mono-xs text-ink-40">
+        <p className="mt-6 font-mono text-mono-xs text-ink-70">
           We kept what you had already written.
         </p>
       )}
@@ -306,7 +306,7 @@ export function BriefForm() {
         {step === 1 && (
           <div className="flex flex-col gap-12">
             <fieldset>
-              <legend className="font-mono text-mono-xs text-ink-40">
+              <legend className="font-mono text-mono-xs text-ink-70">
                 What do you need?
               </legend>
               <ul className="mt-6 flex flex-wrap gap-2">
@@ -353,7 +353,7 @@ export function BriefForm() {
               <label htmlFor="moment" className={LABEL_CLASS}>
                 What is the moment?
               </label>
-              <p id="moment-hint" className="mt-2 font-mono text-mono-xs text-ink-40 tabular-nums">
+              <p id="moment-hint" className="mt-2 font-mono text-mono-xs text-ink-70 tabular-nums">
                 {(values.moment ?? "").length} / 280
               </p>
               {errors.moment && (
@@ -368,7 +368,7 @@ export function BriefForm() {
         {step === 2 && (
           <div className="flex flex-col gap-12">
             <fieldset>
-              <legend className="font-mono text-mono-xs text-ink-40">
+              <legend className="font-mono text-mono-xs text-ink-70">
                 Budget band
               </legend>
               {/* §6.8: laid out as faders, a signal fill rising from the base. */}
@@ -376,9 +376,13 @@ export function BriefForm() {
                 {BUDGET_BANDS.map((band) => {
                   const selected = values.budget === band.value;
                   return (
+                    // The input is sr-only, so it is the label that has to show
+                    // focus. Without this the focusable element is a clipped
+                    // 1px box and a keyboard user cannot see which band they
+                    // are on — SC 2.4.7, and not something axe can detect.
                     <label
                       key={band.value}
-                      className={`relative flex min-h-32 cursor-pointer flex-col justify-end overflow-hidden border p-4 transition-colors duration-[var(--dur-quick)] ${
+                      className={`relative flex min-h-32 cursor-pointer flex-col justify-end overflow-hidden border p-4 transition-colors duration-[var(--dur-quick)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal ${
                         selected ? "border-signal" : "border-ink-15 hover:border-ink-40"
                       }`}
                     >
@@ -426,7 +430,7 @@ export function BriefForm() {
             <div>
               <label
                 htmlFor="attachment"
-                className="block font-mono text-mono-xs text-ink-40"
+                className="block font-mono text-mono-xs text-ink-70"
               >
                 Attachment (optional, PDF or ZIP, 25 MB max)
               </label>
@@ -466,7 +470,7 @@ export function BriefForm() {
               ["Attachment", values.attachmentName || "—"],
             ].map(([label, value]) => (
               <div key={String(label)} className="grid grid-cols-3 gap-4">
-                <dt className="font-mono text-mono-xs text-ink-40">{label}</dt>
+                <dt className="font-mono text-mono-xs text-ink-70">{label}</dt>
                 <dd className="col-span-2 text-body text-ink">{value || "—"}</dd>
               </div>
             ))}
@@ -543,7 +547,7 @@ export function BriefForm() {
         </p>
       </noscript>
 
-      <p className="mt-8 font-mono text-mono-xs text-ink-40">
+      <p className="mt-8 font-mono text-mono-xs text-ink-70">
         Max upload {MAX_UPLOAD_BYTES / 1024 / 1024} MB. We keep briefs for 24
         months, then delete them.
       </p>

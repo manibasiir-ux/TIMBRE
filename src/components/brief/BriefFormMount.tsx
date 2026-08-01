@@ -21,7 +21,7 @@ const Form = dynamic(
     ssr: false,
     loading: () => (
       <section className="shell section-rhythm">
-        <p className="font-mono text-mono-xs text-ink-40">Loading the form…</p>
+        <p className="font-mono text-mono-xs text-ink-70">Loading the form…</p>
       </section>
     ),
   },

@@ -58,9 +58,17 @@ export function Hero() {
             return;
           }
 
+          // aria: "none" because SplitText's default puts an aria-label on
+          // each element it splits, and these are bare spans. A span carries an
+          // implicit generic role, which ARIA prohibits aria-label on — axe
+          // reports it as a serious violation. The accessible name is on the
+          // <h1> instead, where it is permitted, and the lines are hidden from
+          // assistive technology so the heading is announced once rather than
+          // once per line or once per character.
           const split = new SplitText("[data-hero-line]", {
             type: "chars",
             charsClass: "char",
+            aria: "none",
           });
 
           const intro = gsap.timeline({ defaults: { ease: "power4.out" } });
@@ -131,21 +139,27 @@ export function Hero() {
     >
       <div className="scanlines" aria-hidden="true" />
 
-      <h1 className="relative">
+      {/* The name lives on the heading, which permits aria-label, and the lines
+          are hidden so it is announced once as a sentence rather than three
+          fragments — or, after splitting, character by character. */}
+      <h1 className="relative" aria-label="We make brands audible">
         <span
           data-hero-line
+          aria-hidden="true"
           className="block font-display text-mega text-ink [transform-style:preserve-3d]"
         >
           We make
         </span>
         <span
           data-hero-line
+          aria-hidden="true"
           className="block font-display text-mega text-ink [transform-style:preserve-3d] lg:ml-[16.6%]"
         >
           Brands
         </span>
         <span
           data-hero-line
+          aria-hidden="true"
           className="block font-display text-mega text-signal [transform-style:preserve-3d] lg:ml-[8.3%]"
         >
           Audible
@@ -164,7 +178,7 @@ export function Hero() {
           aria-hidden="true"
           data-scroll-cue
         >
-          <span className="font-mono text-mono-xs text-ink-40">Scroll</span>
+          <span className="font-mono text-mono-xs text-ink-70">Scroll</span>
           <span className="relative block h-16 w-px overflow-hidden bg-ink-15">
             <span
               data-scroll-dot

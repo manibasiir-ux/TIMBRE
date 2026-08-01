@@ -140,7 +140,7 @@ export function WorkIndex() {
           })}
 
           <p
-            className="ml-auto font-mono text-mono-xs text-ink-40"
+            className="ml-auto font-mono text-mono-xs text-ink-70"
             aria-live="polite"
           >
             {visible.length} {visible.length === 1 ? "project" : "projects"}
@@ -172,7 +172,7 @@ export function WorkIndex() {
                 >
                   <div className="relative overflow-hidden border border-ink-15 bg-ground-lift p-6 transition-transform duration-[var(--dur-base)] group-hover:-translate-y-2">
                     <div className="flex items-start justify-between gap-4">
-                      <p className="font-mono text-mono-xs text-ink-40">
+                      <p className="font-mono text-mono-xs text-ink-70">
                         {entry.sector} · {entry.tier} · {entry.year}
                       </p>
                       {isPreviewing && (
@@ -189,7 +189,7 @@ export function WorkIndex() {
                     <WaveformRule
                       seed={index + 2}
                       className={`mt-8 transition-colors duration-[var(--dur-base)] ${
-                        isPreviewing ? "text-signal" : "text-ink-40"
+                        isPreviewing ? "text-signal" : "text-ink-70"
                       }`}
                     />
 

@@ -69,7 +69,10 @@ export default function RootLayout({
         <SculptureRouteState />
 
         <SmoothScroll>
-          <main id="main" className="relative z-10">
+          {/* tabIndex -1 so focus can be moved here programmatically when the
+              consent gate closes and on route changes, without adding it to the
+              tab order. */}
+          <main id="main" tabIndex={-1} className="relative z-10 outline-none">
             {children}
           </main>
         </SmoothScroll>

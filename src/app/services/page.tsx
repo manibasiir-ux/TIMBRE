@@ -51,7 +51,7 @@ export default function ServicesPage() {
                   hydration. §7's 0.45s expansion is applied to the panel. */}
               <details className="group">
                 <summary className="flex min-h-11 cursor-pointer items-baseline gap-6 py-6">
-                  <span className="font-mono text-mono-xs text-ink-40">
+                  <span className="font-mono text-mono-xs text-ink-70">
                     {line.number}
                   </span>
                   <span className="flex-1 font-display text-h2 text-ink">
@@ -70,7 +70,7 @@ export default function ServicesPage() {
                     {line.description}
                   </p>
                   <div className="col-span-4 lg:col-span-4">
-                    <p className="font-mono text-mono-xs text-ink-40">
+                    <p className="font-mono text-mono-xs text-ink-70">
                       Deliverables
                     </p>
                     <ul className="mt-3 space-y-2">
@@ -80,7 +80,7 @@ export default function ServicesPage() {
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-6 font-mono text-mono-xs text-ink-40">
+                    <p className="mt-6 font-mono text-mono-xs text-ink-70">
                       {line.duration} · {line.inPackages.join(" · ")}
                     </p>
                   </div>
@@ -115,13 +115,13 @@ export default function ServicesPage() {
                 <p className="mt-6 font-mono text-h3 text-ink tabular-nums">
                   {pack.band}
                 </p>
-                <p className="mt-2 font-mono text-mono-xs text-ink-40">
+                <p className="mt-2 font-mono text-mono-xs text-ink-70">
                   {pack.duration}
                 </p>
 
                 <p className="mt-6 flex-1 text-body text-ink-70">{pack.scope}</p>
 
-                <p className="mt-8 border-t border-ink-15 pt-4 text-small text-ink-40">
+                <p className="mt-8 border-t border-ink-15 pt-4 text-small text-ink-70">
                   {pack.buyer}
                 </p>
               </li>
@@ -136,7 +136,7 @@ export default function ServicesPage() {
           <p className="mt-6 font-mono text-h3 text-signal tabular-nums">
             {RETAINER.band}
           </p>
-          <p className="mt-2 font-mono text-mono-xs text-ink-40">
+          <p className="mt-2 font-mono text-mono-xs text-ink-70">
             {RETAINER.minimum}
           </p>
           <ul className="mt-8 grid grid-cols-1 gap-2 md:grid-cols-2">

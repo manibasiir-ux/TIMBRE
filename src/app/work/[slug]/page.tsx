@@ -52,7 +52,7 @@ export default async function CaseStudyPage({
   return (
     <>
       <section className="shell pt-[14vh] pb-12">
-        <p className="font-mono text-mono-xs text-ink-40">Case study</p>
+        <p className="font-mono text-mono-xs text-ink-70">Case study</p>
         <h1 className="mt-6 font-display text-mega text-ink">{entry.client}</h1>
 
         <dl className="mt-12 grid grid-cols-2 gap-6 font-mono text-mono-xs lg:grid-cols-4">
@@ -63,7 +63,7 @@ export default async function CaseStudyPage({
             ["Territories", entry.territories],
           ].map(([label, value]) => (
             <div key={label}>
-              <dt className="text-ink-40">{label}</dt>
+              <dt className="text-ink-70">{label}</dt>
               <dd className="mt-2 text-ink">{value}</dd>
             </div>
           ))}
@@ -74,7 +74,7 @@ export default async function CaseStudyPage({
 
       <section className="shell section-rhythm grid grid-cols-4 gap-4 lg:grid-cols-12">
         <div className="col-span-4 lg:col-span-6 lg:col-start-2">
-          <h2 className="font-mono text-mono-xs text-ink-40">The brief</h2>
+          <h2 className="font-mono text-mono-xs text-ink-70">The brief</h2>
           <p className="mt-6 text-lead text-ink-70">{entry.brief}</p>
         </div>
       </section>
@@ -116,11 +116,11 @@ export default async function CaseStudyPage({
       </section>
 
       <section className="shell section-rhythm">
-        <h2 className="font-mono text-mono-xs text-ink-40">Credits</h2>
+        <h2 className="font-mono text-mono-xs text-ink-70">Credits</h2>
         <dl className="mt-8 grid grid-cols-4 gap-x-4 gap-y-4 font-mono text-mono-xs lg:grid-cols-12">
           {entry.credits.map((credit) => (
             <div key={credit.role} className="col-span-4 lg:col-span-6">
-              <dt className="text-ink-40">{credit.role}</dt>
+              <dt className="text-ink-70">{credit.role}</dt>
               <dd className="mt-1 text-ink">{credit.name}</dd>
             </div>
           ))}
@@ -128,7 +128,7 @@ export default async function CaseStudyPage({
       </section>
 
       <section className="shell section-rhythm border-t border-ink-15">
-        <p className="font-mono text-mono-xs text-ink-40">Next project</p>
+        <p className="font-mono text-mono-xs text-ink-70">Next project</p>
         <Link
           href={`/work/${next.slug}`}
           className="group mt-6 block max-w-[20ch]"

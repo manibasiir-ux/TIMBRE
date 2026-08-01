@@ -31,10 +31,6 @@ const WEBGL_SIGNATURE = /WebGLRenderer|IcosahedronGeometry|BufferGeometry/;
 const kb = (bytes) => bytes / 1024;
 const fmt = (bytes) => `${kb(bytes).toFixed(1)} KB`;
 
-function gzipSize(path) {
-  return gzipSync(readFileSync(path)).length;
-}
-
 function fail(message) {
   console.error(`\n  FAIL  ${message}`);
   process.exitCode = 1;

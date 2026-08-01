@@ -6,7 +6,15 @@ name: timbre
 #   docker compose run --rm cli "npm install" install or refresh dependencies
 #   docker compose up web                     dev server on http://localhost:3000
 #   docker compose run --rm cli "npm run lint"
+#   docker compose run --rm e2e               end-to-end and accessibility
+#   docker compose --profile tools down       stop everything, including e2e
 #   docker compose down -v                    stop and discard the volumes
+#
+# Note the --profile tools on that down. Plain `docker compose down` leaves
+# profiled services running, so web-prod survives it and keeps serving whatever
+# it built when it started. That cost an hour: app-side fixes appeared to have
+# no effect because the server under test was twelve minutes older than the
+# edits, while test-side fixes worked because they need no rebuild.
 #
 # Bind sources are relative on purpose. The absolute host path contains spaces
 # and an apostrophe, which is a quoting hazard, so it is never written down.
@@ -34,8 +42,25 @@ x-app-volumes: &app-volumes
   - .:/app
   - node_modules:/app/node_modules
 
+# The production server builds and serves from a volume rather than the bind
+# mount. Sharing .next with the host let a build in one container and a serve in
+# another see different generations of the same directory: the prerendered HTML
+# referenced chunk hashes that were not on disk, the browser got a 500 and a
+# text/plain body for two scripts, refused to execute them, and the page never
+# hydrated. Every e2e test that clicked anything failed; every test that only
+# read the DOM passed.
+#
+# The dev server keeps .next on the bind mount on purpose — Turbopack splits its
+# state across .next and .next-internal, and separating those breaks
+# recompilation. Production has no such constraint.
+x-prod-volumes: &prod-volumes
+  - .:/app
+  - node_modules:/app/node_modules
+  - next_build:/app/.next
+
 volumes:
   node_modules:
+  next_build:
 
 services:
   # One-shot. Generates the Next.js application, never overwriting a file that
@@ -61,6 +86,56 @@ services:
     volumes: *app-volumes
     stdin_open: true
     tty: true
+    # depends_on alone waits for the container to start, not for Next to have
+    # compiled a route, so e2e would connect to a server that is not answering
+    # yet. The generous start_period covers the first compile.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
+
+  # The production server, for end-to-end runs.
+  #
+  # e2e deliberately does not point at the dev server. `next dev` compiles a
+  # route the first time it is requested, and under two Playwright workers on
+  # four cores that measured 43-56s per first hit — past any sensible
+  # navigation timeout, so every test failed on the clock rather than on a
+  # defect. `next start` serves the prebuilt routes, and it is also what
+  # actually ships: testing an unminified dev build with hot-reload machinery
+  # attached is testing something nobody visits.
+  #
+  # Reads .next from the bind mount, so `npm run build` in cli is its input.
+  web-prod:
+    build:
+      context: .
+      target: dev
+    profiles: ["tools"]
+    environment: *app-environment
+    volumes: *prod-volumes
+    # Builds and serves in the same container off the same volume, so the HTML
+    # and the chunks it references are always from one generation.
+    command: ["sh", "-c", "npm run build && npm run start"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      # Long enough to cover a cold production build.
+      start_period: 150s
 
   # One-shot task runner for npm, lint, typecheck, tests and builds.
   #   docker compose run --rm cli "npm run lint"
@@ -73,3 +148,32 @@ services:
     volumes: *app-volumes
     entrypoint: ["bash", "-c"]
     command: ["node --version && npm --version"]
+
+  # End-to-end and accessibility.
+  #   docker compose run --rm e2e
+  #
+  # Microsoft's image rather than the project's own: Chromium and WebKit need
+  # system libraries node:slim does not carry, and this ships them already
+  # installed. The tag must track @playwright/test exactly — a runner and a
+  # browser set from different releases do not agree about the protocol
+  # between them.
+  #
+  # WebGL here is software-rendered, so these runs always take the fallback
+  # render profile and can never exercise the hero. What they can cover is
+  # everything that is not the canvas, including prefers-reduced-motion, which
+  # Playwright can emulate and a real browser session cannot be made to.
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    profiles: ["tools"]
+    working_dir: /app
+    environment:
+      <<: *app-environment
+      E2E_BASE_URL: http://web-prod:3000
+      # The image installs browsers here; npm's own download was skipped.
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    volumes: *app-volumes
+    depends_on:
+      web-prod:
+        condition: service_healthy
+    entrypoint: ["bash", "-c"]
+    command: ["npx playwright test"]

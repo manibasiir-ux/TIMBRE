@@ -119,20 +119,20 @@ export function CaseAudio({
                 >
                   <span
                     aria-hidden="true"
-                    className={`font-mono text-mono-xs ${isActive ? "text-signal" : "text-ink-40"}`}
+                    className={`font-mono text-mono-xs ${isActive ? "text-signal" : "text-ink-70"}`}
                   >
                     {isActive ? "❚❚" : "▶"}
                   </span>
                   <span className="flex-1 font-mono text-mono-xs text-ink">
                     {item.name}
                   </span>
-                  <span className="font-mono text-mono-xs text-ink-40 tabular-nums">
+                  <span className="font-mono text-mono-xs text-ink-70 tabular-nums">
                     {seconds(item.seconds)}
                   </span>
-                  <span className="font-mono text-mono-xs text-ink-40 tabular-nums">
+                  <span className="font-mono text-mono-xs text-ink-70 tabular-nums">
                     {item.lufs} LUFS
                   </span>
-                  <span className="font-mono text-mono-xs text-ink-40">
+                  <span className="font-mono text-mono-xs text-ink-70">
                     {item.format}
                   </span>
                 </button>
@@ -142,7 +142,7 @@ export function CaseAudio({
         </ul>
 
         {disabled && (
-          <p className="mt-4 font-mono text-mono-xs text-ink-40">
+          <p className="mt-4 font-mono text-mono-xs text-ink-70">
             {disabledReason}. The inventory above is the full delivered list
             either way.
           </p>
@@ -174,7 +174,7 @@ export function CaseAudio({
                 >
                   <span
                     aria-hidden="true"
-                    className={`font-mono text-mono ${isActive ? "text-signal" : "text-ink-40"}`}
+                    className={`font-mono text-mono ${isActive ? "text-signal" : "text-ink-70"}`}
                   >
                     {isActive ? "◉" : "◎"}
                   </span>

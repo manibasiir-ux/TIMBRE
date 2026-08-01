@@ -16,7 +16,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:bundle": "node scripts/check-bundle.mjs",
-    "verify": "npm run lint && npm run typecheck && npm test && npm run build && npm run check:bundle"
+    "verify": "npm run lint && npm run typecheck && npm run check:ink40 && npm test && npm run build && npm run check:bundle",
+    "e2e": "playwright test",
+    "e2e:a11y": "playwright test e2e/a11y.spec.ts",
+    "check:ink40": "node scripts/check-ink40.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -31,6 +34,8 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
