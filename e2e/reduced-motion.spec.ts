@@ -101,6 +101,33 @@ test.describe("reduced motion", () => {
     }
   });
 
+  /**
+   * Not covered here: that the sculpture actually recedes behind the manifesto.
+   *
+   * It should be — a defect lived in exactly that gap from phase 4 to phase 9,
+   * where `useFrame` returned early before applying `recede`, so the manifesto
+   * set a value nothing read and its copy sat over a fully lit form at roughly
+   * 1.1:1. Three things block a pixel test for it, and all three were measured
+   * rather than assumed:
+   *
+   * 1. The container renders through SwiftShader, which the NFR-07 probe
+   *    correctly rejects, so there is normally no canvas at all. Seeding the
+   *    documented `sessionStorage` profile does force one.
+   * 2. Under reduced motion that canvas runs `frameloop="demand"`, and
+   *    `readPixels` returned an all-zero buffer on 60 consecutive frames
+   *    including ones where a render had just been requested. Without
+   *    `preserveDrawingBuffer` there is nothing to read after the frame ends,
+   *    and turning that on to serve a test would cost every real visitor.
+   * 3. Even under continuous rendering the container disagrees with a real GPU
+   *    about what it drew — 13.8% silhouette against 33% at the same scroll
+   *    position. A test asserting the former would encode SwiftShader, not the
+   *    product.
+   *
+   * So this is verified on a real GPU instead, and the reduced-motion half of
+   * it remains unverified end to end. It needs a browser genuinely reporting
+   * the preference, which no automated surface available here can do.
+   */
+
   test("every route still renders its heading", async ({ page }) => {
     for (const route of ROUTES) {
       await visit(page, route.path);

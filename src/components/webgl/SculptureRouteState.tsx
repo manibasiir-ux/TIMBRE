@@ -7,6 +7,7 @@ import {
   SCULPTURE_SCROLL,
   sculptureMotion,
 } from "@/lib/motion/sculptureMotion";
+import { requestSculptureRender } from "@/lib/motion/sculptureRender";
 import { resetIdentity } from "@/lib/webgl/sculptureIdentity";
 
 /**
@@ -37,6 +38,10 @@ export function SculptureRouteState() {
     // client's identity onto every subsequent route, so a case study would
     // open under whichever sculpture the rail happened to be holding.
     resetIdentity();
+
+    // Under reduced motion the canvas renders on demand, so none of the above
+    // reaches the screen without asking for a frame.
+    requestSculptureRender();
   }, [pathname]);
 
   return null;

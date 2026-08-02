@@ -145,20 +145,32 @@ export function SoundSculpture({
   const idleRotation = useRef(0);
 
   useFrame((_, delta) => {
-    if (reducedMotion) return;
-
     const u = material.current?.uniforms;
     if (!u) return;
 
-    // Clamped because a backgrounded tab can deliver one enormous delta on
-    // resume, which would jump the noise field and read as a glitch.
-    const step = Math.min(delta, 0.1);
-    u.uTime.value += step;
+    // Only the time-varying half is skipped under reduced motion — the pose is
+    // fixed, so advancing the noise field or chasing the analyser would be the
+    // animation §10 asks to stop.
+    //
+    // Everything below this block still applies, and used to not. The whole
+    // callback returned early, which meant `recede` was written by the
+    // manifesto and read by nobody: the sculpture never withdrew, and copy that
+    // relies on it withdrawing sat over lit peaks at roughly 1.1:1. Reduced
+    // motion is a designed state, not a stripped one, and that includes the
+    // states that exist to keep text legible.
+    if (!reducedMotion) {
+      // Clamped because a backgrounded tab can deliver one enormous delta on
+      // resume, which would jump the noise field and read as a glitch.
+      const step = Math.min(delta, 0.1);
+      u.uTime.value += step;
 
-    const current = bands.current;
-    u.uLow.value = lerp(u.uLow.value, current.low, SMOOTHING.low);
-    u.uMid.value = lerp(u.uMid.value, current.mid, SMOOTHING.mid);
-    u.uHigh.value = lerp(u.uHigh.value, current.high, SMOOTHING.high);
+      const current = bands.current;
+      u.uLow.value = lerp(u.uLow.value, current.low, SMOOTHING.low);
+      u.uMid.value = lerp(u.uMid.value, current.mid, SMOOTHING.mid);
+      u.uHigh.value = lerp(u.uHigh.value, current.high, SMOOTHING.high);
+
+      idleRotation.current += step * 0.06;
+    }
 
     // The per-case identity, FR-04. Read from a plain object the rail tweens,
     // for the same reason as sculptureMotion below.
@@ -197,8 +209,11 @@ export function SoundSculpture({
     u.uMix.value = receded.mix;
 
     if (mesh.current) {
-      idleRotation.current += step * 0.06;
-      mesh.current.rotation.y = idleRotation.current + sculptureMotion.orbit;
+      // Rotation is animation and stays behind the guard; the composed pose is
+      // set declaratively below and must not be overwritten here.
+      if (!reducedMotion) {
+        mesh.current.rotation.y = idleRotation.current + sculptureMotion.orbit;
+      }
       mesh.current.scale.setScalar(receded.scale);
     }
   });

@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { caseBySlug } from "@/content/cases";
+import { onSculptureRenderRequest } from "@/lib/motion/sculptureRender";
 import { onTick } from "@/lib/motion/ticker";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import {
@@ -75,6 +76,29 @@ function TickerBridge() {
     () => onTick((_deltaMs, timeSeconds) => advance(timeSeconds * 1000)),
     [advance],
   );
+
+  return null;
+}
+
+/**
+ * Renders a frame on request, for the reduced-motion `frameloop="demand"` path.
+ *
+ * The manifesto's recede and a route reset are discrete events that change what
+ * the canvas should show without producing a frame. This is the only place that
+ * knows about `invalidate`, which keeps three.js out of the initial chunk — see
+ * sculptureRender.
+ *
+ * It renders once when it subscribes, because the canvas is lazily mounted and
+ * client-only: a request made while it did not exist would otherwise be lost,
+ * and the very first paint is exactly when that happens.
+ */
+function RenderRequestBridge() {
+  const invalidate = useThree((state) => state.invalidate);
+
+  useEffect(() => {
+    invalidate();
+    return onSculptureRenderRequest(() => invalidate());
+  }, [invalidate]);
 
   return null;
 }
@@ -169,6 +193,7 @@ export default function SceneRoot() {
           detail={settings.detail}
           reducedMotion={reducedMotion}
         />
+        <RenderRequestBridge />
         {driveFromTicker && <TickerBridge />}
         {driveFromTicker && <PerformanceGuard onDegrade={degrade} />}
       </Canvas>

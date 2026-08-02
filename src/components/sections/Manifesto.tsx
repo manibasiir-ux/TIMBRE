@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useEffect, useRef } from "react";
 
 import { sculptureMotion } from "@/lib/motion/sculptureMotion";
+import { requestSculptureRender } from "@/lib/motion/sculptureRender";
 import { useReveal } from "@/lib/motion/useReveal";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -57,6 +58,11 @@ export function Manifesto() {
 
       // Under reduced motion there is no scrub to hide behind, so the sculpture
       // simply sits receded wherever this section exists.
+      //
+      // The canvas runs on demand here, so writing recede is not enough to
+      // change anything on screen — it has to be asked for a frame. Without
+      // that this branch wrote a value nobody read, and the copy below sat over
+      // a fully lit sculpture at about 1.1:1.
       media.add("(prefers-reduced-motion: reduce)", () => {
         const trigger = ScrollTrigger.create({
           trigger: root,
@@ -64,11 +70,13 @@ export function Manifesto() {
           end: "bottom top",
           onToggle: (self) => {
             sculptureMotion.recede = self.isActive ? 1 : 0;
+            requestSculptureRender();
           },
         });
         return () => {
           trigger.kill();
           sculptureMotion.recede = 0;
+          requestSculptureRender();
         };
       });
     }, root);
