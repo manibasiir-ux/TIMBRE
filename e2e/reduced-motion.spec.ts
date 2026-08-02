@@ -67,6 +67,40 @@ test.describe("reduced motion", () => {
     await expect(manifesto).toBeAttached();
   });
 
+  test("the work rail is a plain list, not a pinned scrub", async ({ page }) => {
+    await visit(page, "/");
+
+    // §6.1's rail is a horizontal scrub pinned for several viewports. Holding
+    // someone in a pinned section while the content moves sideways under them
+    // is the exact experience §10 exists to prevent, so here it is four cards
+    // stacked down the page — same content, ordinary scrolling.
+    const cards = page.locator("[data-case-card]");
+    await expect(cards).toHaveCount(4);
+
+    const track = cards.first().locator("..");
+    const transform = await track.evaluate(
+      (element) => getComputedStyle(element).transform,
+    );
+    expect(["none", "matrix(1, 0, 0, 1, 0, 0)"]).toContain(transform);
+
+    // Stacked, not laid out in a row.
+    const first = await cards.first().boundingBox();
+    const second = await cards.nth(1).boundingBox();
+    expect(second!.y).toBeGreaterThan(first!.y);
+  });
+
+  test("every work card is legible without a morph to explain it", async ({
+    page,
+  }) => {
+    await visit(page, "/");
+
+    // The sculpture holds a fixed pose here, so nothing about a case is
+    // carried by the form changing. Content parity means the card says it.
+    for (const client of ["Kestrel", "Halcyon Mobility", "Solene Group"]) {
+      await expect(page.getByText(client, { exact: true })).toBeAttached();
+    }
+  });
+
   test("every route still renders its heading", async ({ page }) => {
     for (const route of ROUTES) {
       await visit(page, route.path);

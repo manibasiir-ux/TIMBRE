@@ -1,13 +1,13 @@
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 import { Hero } from "@/components/hero/Hero";
 import { Manifesto } from "@/components/sections/Manifesto";
+import { WorkRail } from "@/components/work/WorkRail";
 
 /**
  * Home, specification §6.1.
  *
- * Hero and manifesto are in place. The work rail, service ticker, client wall,
- * journal teaser and brief slab follow once there is content and there are
- * routes to send people to.
+ * Hero, manifesto and work rail are in place. The service ticker, client wall,
+ * journal teaser and brief slab follow.
  */
 export default function Home() {
   return (
@@ -16,6 +16,7 @@ export default function Home() {
       <WaveformRule />
       <Manifesto />
       <WaveformRule seed={7} />
+      <WorkRail />
     </>
   );
 }

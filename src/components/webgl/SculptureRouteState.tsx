@@ -7,6 +7,7 @@ import {
   SCULPTURE_SCROLL,
   sculptureMotion,
 } from "@/lib/motion/sculptureMotion";
+import { resetIdentity } from "@/lib/webgl/sculptureIdentity";
 
 /**
  * Sets the sculpture's resting state for the current route.
@@ -31,6 +32,11 @@ export function SculptureRouteState() {
     sculptureMotion.gain = SCULPTURE_SCROLL.gainFrom;
     sculptureMotion.orbit = SCULPTURE_SCROLL.orbitFrom;
     sculptureMotion.recede = isHome ? 0 : 1;
+
+    // Leaving home from inside the work rail would otherwise carry that
+    // client's identity onto every subsequent route, so a case study would
+    // open under whichever sculpture the rail happened to be holding.
+    resetIdentity();
   }, [pathname]);
 
   return null;

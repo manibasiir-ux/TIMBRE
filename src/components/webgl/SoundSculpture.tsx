@@ -7,9 +7,13 @@ import * as THREE from "three";
 
 import { SMOOTHING, lerp } from "@/lib/audio/bands";
 import { useAudioAnalyser } from "@/lib/audio/useAudioAnalyser";
-import { PALETTE } from "@/lib/color/palette";
 import { SNOISE } from "@/lib/glsl/snoise";
 import { recedeState, sculptureMotion } from "@/lib/motion/sculptureMotion";
+import {
+  IDENTITY_COLOURS,
+  NEUTRAL_IDENTITY,
+  activeIdentity,
+} from "@/lib/webgl/sculptureIdentity";
 import {
   DISPLACEMENT,
   SCULPTURE_RADIUS,
@@ -31,12 +35,18 @@ import {
  * analyser hands back a ref.
  */
 
+// uFrequency and uRipple carry the per-case identity, FR-04. They were the
+// literals 1.7 and 1.0 until the work rail needed four distinguishable forms
+// out of one geometry; see sculptureIdentity for why the morph is parametric
+// rather than a primitive swap.
 const vertexShader = /* glsl */ `
   uniform float uTime;
   uniform float uLow;
   uniform float uMid;
   uniform float uHigh;
   uniform float uGain;
+  uniform float uFrequency;
+  uniform float uRipple;
 
   varying float vDisp;
 
@@ -45,9 +55,9 @@ const vertexShader = /* glsl */ `
   void main() {
     vec3 p = position;
 
-    float n = snoise(p * 1.7 + uTime * 0.18);
+    float n = snoise(p * uFrequency + uTime * 0.18);
     float disp = n * (${DISPLACEMENT.base} + uLow * ${DISPLACEMENT.lowGain}) * uGain
-               + sin(p.y * 14.0 + uTime * 3.0) * uMid * ${DISPLACEMENT.midGain}
+               + sin(p.y * 14.0 + uTime * 3.0) * uMid * ${DISPLACEMENT.midGain} * uRipple
                + uHigh * ${DISPLACEMENT.highGain};
 
     vDisp = disp;
@@ -107,13 +117,29 @@ export function SoundSculpture({
       uMid: { value: reducedMotion ? COMPOSED_POSE.mid : 0 },
       uHigh: { value: reducedMotion ? COMPOSED_POSE.high : 0 },
       uGain: { value: gain },
-      uBase: { value: new THREE.Color(PALETTE.groundLift) },
-      uSignal: { value: new THREE.Color(PALETTE.signal) },
+      uFrequency: { value: NEUTRAL_IDENTITY.frequency },
+      uRipple: { value: NEUTRAL_IDENTITY.ripple },
+      uBase: { value: new THREE.Color(IDENTITY_COLOURS.bodyFrom) },
+      uSignal: { value: new THREE.Color(IDENTITY_COLOURS.accentFrom) },
       uMix: { value: 1 },
       uRampStart: { value: signalRampFor(gain).start },
       uRampEnd: { value: signalRampFor(gain).end },
     }),
     [gain, reducedMotion],
+  );
+
+  // Endpoints for the two colour axes, allocated once. Colour is interpolated
+  // straight into the uniform each frame, so a per-frame `new THREE.Color`
+  // would allocate sixty objects a second for the garbage collector to sweep
+  // during the exact interaction that has to stay smooth.
+  const colourEndpoints = useMemo(
+    () => ({
+      bodyFrom: new THREE.Color(IDENTITY_COLOURS.bodyFrom),
+      bodyTo: new THREE.Color(IDENTITY_COLOURS.bodyTo),
+      accentFrom: new THREE.Color(IDENTITY_COLOURS.accentFrom),
+      accentTo: new THREE.Color(IDENTITY_COLOURS.accentTo),
+    }),
+    [],
   );
 
   const idleRotation = useRef(0);
@@ -134,9 +160,29 @@ export function SoundSculpture({
     u.uMid.value = lerp(u.uMid.value, current.mid, SMOOTHING.mid);
     u.uHigh.value = lerp(u.uHigh.value, current.high, SMOOTHING.high);
 
+    // The per-case identity, FR-04. Read from a plain object the rail tweens,
+    // for the same reason as sculptureMotion below.
+    u.uFrequency.value = activeIdentity.frequency;
+    u.uRipple.value = activeIdentity.ripple;
+
+    u.uBase.value.lerpColors(
+      colourEndpoints.bodyFrom,
+      colourEndpoints.bodyTo,
+      activeIdentity.warmth,
+    );
+    u.uSignal.value.lerpColors(
+      colourEndpoints.accentFrom,
+      colourEndpoints.accentTo,
+      activeIdentity.patina,
+    );
+
     // Scroll drives displacement gain and orbit, §7. Read from a plain object
     // written by ScrollTrigger, so a scrub frame costs no React work.
-    const totalGain = gain * sculptureMotion.gain;
+    //
+    // Swell multiplies in here rather than into the displacement directly so
+    // the ramp below inherits it. A case that swells the form therefore raises
+    // its own signal threshold and cannot breach the 4% ceiling by growing.
+    const totalGain = gain * sculptureMotion.gain * activeIdentity.swell;
     u.uGain.value = totalGain;
 
     // The ramp has to move with the gain, or the accent grows with the
