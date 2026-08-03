@@ -3,10 +3,11 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WaveformRule } from "@/components/primitives/WaveformRule";
-import { CASES } from "@/content/cases";
+import { CASES, stemFor } from "@/content/cases";
+import { audioEngine } from "@/lib/audio/AudioEngine";
 import {
   MORPH_SECONDS,
   NEUTRAL_IDENTITY,
@@ -44,6 +45,15 @@ const FEATURED = CASES.filter((entry) => entry.featured);
 /** §7 "Work rail": scrub 1.2, linear. */
 const RAIL_SCRUB = 1.2;
 
+/**
+ * How loud a case stem plays as its card centres.
+ *
+ * Louder than the work index's 0.35 audition, because there the bed is still
+ * running underneath and here it has been ducked 12dB to make room. The stem is
+ * meant to be the thing you are listening to, not a hint under the music.
+ */
+const RAIL_STEM_GAIN = 0.7;
+
 export function WorkRail() {
   const section = useRef<HTMLElement>(null);
   const track = useRef<HTMLUListElement>(null);
@@ -59,6 +69,124 @@ export function WorkRail() {
   const revealCard = useRef<((card: HTMLElement) => void) | null>(null);
 
   const setActiveCase = useExperience((state) => state.setActiveCase);
+  const markStemUnavailable = useExperience(
+    (state) => state.markStemUnavailable,
+  );
+  const consent = useExperience((state) => state.consent);
+  const muted = useExperience((state) => state.muted);
+  const canPlay = consent === "granted" && !muted;
+
+  /**
+   * The rail's audio, §6.1 item 5.
+   *
+   * Held in refs rather than state because the GSAP callbacks that drive it are
+   * created once and would otherwise read whatever `canPlay` was at mount
+   * forever — which is how a muted visitor ends up hearing something.
+   *
+   * `ducked` is a boolean and not a counter on purpose. The engine's duck is
+   * reference-counted, so an unmatched duck leaves the bed quiet for the rest
+   * of the session with nothing on screen to explain it. One duck is taken when
+   * the rail starts playing and released when it stops, whatever happens to the
+   * cards in between.
+   */
+  const [sounding, setSounding] = useState<string | null>(null);
+  const canPlayRef = useRef(canPlay);
+  const wantedSlug = useRef<string | null>(null);
+  const voice = useRef<{ playing: string | null; ducked: boolean }>({
+    playing: null,
+    ducked: false,
+  });
+
+  /**
+   * Silences the rail. Touches the engine and refs only, never state.
+   *
+   * The badge is cleared separately, by `silenceRail`, because this also runs
+   * from effects — when the visitor mutes, and on unmount — and setting state
+   * synchronously inside an effect cascades renders. The badge does not need
+   * it: it is rendered through `canPlay`, so muting hides it without anything
+   * having to be set.
+   */
+  const stopRailAudio = useCallback(() => {
+    const state = voice.current;
+    if (state.playing) {
+      audioEngine.stop(state.playing, 0.35);
+      state.playing = null;
+    }
+    if (state.ducked) {
+      audioEngine.releaseDuck();
+      state.ducked = false;
+    }
+  }, []);
+
+  /** Silences the rail from an event callback, where clearing state is safe. */
+  const silenceRail = useCallback(() => {
+    stopRailAudio();
+    setSounding(null);
+  }, [stopRailAudio]);
+
+  const playCase = useCallback(
+    async (slug: string) => {
+      if (!canPlayRef.current) return;
+
+      const entry = FEATURED.find((item) => item.slug === slug);
+      const asset = entry ? stemFor(entry) : null;
+      if (!asset) return;
+
+      const buffer = await audioEngine.load(asset.id, asset.url);
+
+      // The await is long enough to scroll past two more cards, and long enough
+      // for the visitor to mute or leave. Edge case E6: a stem that will not
+      // load says so rather than failing silently.
+      if (!buffer) {
+        markStemUnavailable(asset.id);
+        return;
+      }
+      if (wantedSlug.current !== slug || !canPlayRef.current) return;
+
+      const state = voice.current;
+
+      // The outgoing stem is silenced and disowned in the same breath. Stopping
+      // it while leaving the badge pointing at it would leave the previous card
+      // lit with nothing playing if the incoming one then failed to start.
+      if (state.playing && state.playing !== asset.id) {
+        audioEngine.stop(state.playing, 0.25);
+        state.playing = null;
+        setSounding(null);
+      }
+
+      const started = audioEngine.play(asset.id, {
+        bus: "sfx",
+        fadeSeconds: 0.25,
+        gain: RAIL_STEM_GAIN,
+      });
+
+      // Both the badge and the duck follow what the engine did, not what was
+      // asked of it. Ducking first would leave the bed quiet under a card that
+      // never sounded, and lighting the badge from intent would claim audio
+      // nobody can hear — the one thing this section cannot get wrong.
+      if (!started) return;
+
+      if (!state.ducked) {
+        audioEngine.duck();
+        state.ducked = true;
+      }
+      state.playing = asset.id;
+      setSounding(slug);
+    },
+    [markStemUnavailable],
+  );
+
+  // Declining or muting has to silence the rail immediately, not at the next
+  // card. FR-22 puts a sound-off control one interaction away from anywhere,
+  // and it is worth nothing if this keeps playing through it.
+  useEffect(() => {
+    canPlayRef.current = canPlay;
+    if (!canPlay) stopRailAudio();
+  }, [canPlay, stopRailAudio]);
+
+  // A route change unmounts the rail mid-card. Without this the stem keeps
+  // playing over the case study and the bed stays ducked for good.
+  useEffect(() => stopRailAudio, [stopRailAudio]);
 
   useEffect(() => {
     const root = section.current;
@@ -73,6 +201,10 @@ export function WorkRail() {
       // SceneRoot, so this is also the text equivalent for the morph.
       setActiveCase(entry.slug);
 
+      // §6.1 item 5: the card that reaches the centre is auditioned.
+      wantedSlug.current = entry.slug;
+      void playCase(entry.slug);
+
       // overwrite because a fast scroll can cross three cards inside one 1.2s
       // morph, and three live tweens on the same five floats fight each other.
       gsap.to(activeIdentity, {
@@ -85,6 +217,8 @@ export function WorkRail() {
 
     const leaveRail = () => {
       setActiveCase(null);
+      wantedSlug.current = null;
+      silenceRail();
       gsap.to(activeIdentity, {
         ...NEUTRAL_IDENTITY,
         duration: MORPH_SECONDS,
@@ -101,6 +235,13 @@ export function WorkRail() {
       // design — the case identities are carried by the cards themselves, so
       // nothing is lost by leaving the form still. Pinning a section for four
       // viewports of scroll would be hostile here, not merely animated.
+      //
+      // It also gets no rail audio, and that is a decision rather than a
+      // consequence of there being no centred card to trigger it. Sound that
+      // starts because the page moved is the audible half of scroll-jacking,
+      // and someone who has asked for less of that has not asked for it in
+      // another sense. Every stem stays reachable, by name and on purpose, from
+      // the case study each card links to.
       media.add("(prefers-reduced-motion: no-preference)", () => {
         const distanceFor = () =>
           Math.max(0, rail.scrollWidth - window.innerWidth);
@@ -238,7 +379,7 @@ export function WorkRail() {
     }, root);
 
     return () => context.revert();
-  }, [setActiveCase]);
+  }, [setActiveCase, playCase, silenceRail]);
 
   return (
     <>
@@ -285,7 +426,14 @@ export function WorkRail() {
           ref={track}
           className="flex shrink-0 items-stretch gap-8 px-[6vw] will-change-transform motion-reduce:flex-col motion-reduce:gap-10 motion-reduce:px-0 motion-reduce:will-change-auto"
         >
-          {FEATURED.map((entry, index) => (
+          {FEATURED.map((entry, index) => {
+            // Sounding, not merely centred: with sound declined or muted the
+            // card is still the active one and nothing is playing, and marking
+            // it as playing would be a lie told to exactly the people who
+            // cannot hear it.
+            const isSounding = canPlay && sounding === entry.slug;
+
+            return (
             <li
               key={entry.slug}
               data-case-card
@@ -294,12 +442,19 @@ export function WorkRail() {
               <Link
                 href={`/work/${entry.slug}`}
                 onFocus={(event) => revealCard.current?.(event.currentTarget)}
-                className="group flex h-full flex-col justify-between border border-ink-15 bg-ground-lift p-8 transition-colors duration-[var(--dur-base)] hover:border-ink-40 focus-visible:outline-2 motion-reduce:h-auto motion-reduce:gap-8"
+                className={`group flex h-full flex-col justify-between border bg-ground-lift p-8 transition-colors duration-[var(--dur-base)] hover:border-ink-40 focus-visible:outline-2 motion-reduce:h-auto motion-reduce:gap-8 ${
+                  isSounding ? "border-signal" : "border-ink-15"
+                }`}
               >
                 <div>
-                  <p className="font-mono text-mono-xs text-ink-70">
-                    {String(index + 1).padStart(2, "0")} · {entry.sector} ·{" "}
-                    {entry.tier} · {entry.year}
+                  <p className="flex items-center gap-3 font-mono text-mono-xs text-ink-70">
+                    <span>
+                      {String(index + 1).padStart(2, "0")} · {entry.sector} ·{" "}
+                      {entry.tier} · {entry.year}
+                    </span>
+                    {isSounding && (
+                      <span className="text-signal">◉ SOUNDING</span>
+                    )}
                   </p>
 
                   <p
@@ -310,14 +465,37 @@ export function WorkRail() {
                   </p>
                 </div>
 
-                {/* §6.1 asks for a live 120px waveform thumbnail. The stems are
-                    synthesised placeholders and the analyser only ever holds
-                    one playing source, so this is the deterministic rule seeded
-                    per case rather than a claim about audio nobody is
-                    playing. */}
+                {/* §6.1 item 5: a 120px waveform thumbnail that reads against
+                    the playing stem. The shape is the deterministic rule seeded
+                    per case rather than live analyser data — the analyser holds
+                    one mix, not one trace per card — but it marks the card that
+                    is actually sounding, which is what the requirement is for.
+
+                    signal-dim, not signal. 160 strokes across a 120px box is a
+                    lot of area: measured at 486x702 the lit waveform alone came
+                    to 3.43% of the viewport, and with the card border and the
+                    two mono labels the screen totalled 4.46% against the 4%
+                    ceiling §3.1 rule 1 puts on the accent. signal-dim is the
+                    token for a meter tail, which is exactly what this is, and
+                    it leaves full signal to the border and the badge — the two
+                    marks that actually say "this one". Measured at 5.96:1 on
+                    ground-lift, comfortably past the 3:1 SC 1.4.11 asks of a
+                    non-text indicator. */}
                 <WaveformRule
                   seed={index + 11}
-                  className="h-[120px] shrink-0 transition-colors duration-[var(--dur-base)] group-hover:text-signal"
+                  className="h-[120px] shrink-0 transition-colors duration-[var(--dur-base)]"
+                  // Inline, not a utility class. WaveformRule carries its own
+                  // `text-ink-40` default, and two colour utilities on one
+                  // element are resolved by their order in the generated
+                  // stylesheet rather than in the class attribute — so which
+                  // one wins is a coincidence of token declaration order. It
+                  // happened to favour `text-signal` and not `text-signal-dim`,
+                  // which is how this shipped grey for a minute.
+                  style={
+                    isSounding
+                      ? { color: "var(--color-signal-dim)" }
+                      : undefined
+                  }
                 />
 
                 <div>
@@ -330,7 +508,8 @@ export function WorkRail() {
                 </div>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
     </>

@@ -128,6 +128,50 @@ test.describe("work rail", () => {
     await expect(last).toBeInViewport();
   });
 
+  test("never sounds when the visitor declined audio", async ({ page }) => {
+    // §6.1 item 5 auditions the centred card. FR-01 says nothing plays without
+    // an explicit gesture, and a scroll is not one. The badge is set from what
+    // the engine actually started, so its absence is the assertion.
+    await visit(page, "/"); // answers the gate with "Stay silent"
+    await scrollToRail(page);
+    await page.waitForTimeout(2500);
+
+    await expect(page.getByText(/sounding/i)).toHaveCount(0);
+
+    await page.evaluate(() => window.scrollBy({ top: 700 }));
+    await page.waitForTimeout(2500);
+    await expect(page.getByText(/sounding/i)).toHaveCount(0);
+  });
+
+  test("marks at most one card as sounding", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /play the room/i }).click();
+    await scrollToRail(page);
+
+    // Crossing several cards inside one fade would leave two lit if the badge
+    // were per-card state rather than one slug.
+    for (const offset of [0, 600, 1200]) {
+      await page.evaluate((by) => window.scrollBy({ top: by }), offset);
+      await page.waitForTimeout(1800);
+      expect(await page.getByText(/sounding/i).count()).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test("stops sounding on the way out of the rail", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /play the room/i }).click();
+    await scrollToRail(page);
+    await page.waitForTimeout(2500);
+
+    // Whether the container's Web Audio actually starts is not something this
+    // suite can rely on, so this only asserts the teardown: if nothing was
+    // sounding the expectation is trivially true, and if something was, it has
+    // to stop. The bed's duck is released on the same path.
+    await page.evaluate(() => window.scrollTo({ top: 0 }));
+    await page.waitForTimeout(2000);
+    await expect(page.getByText(/sounding/i)).toHaveCount(0);
+  });
+
   test("keeps every card reachable by keyboard", async ({ page }) => {
     await visit(page, "/");
     await scrollToRail(page);

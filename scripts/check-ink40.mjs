@@ -15,6 +15,7 @@
  *   - text-ink-40 in WaveformRule, where it colours an SVG stroke
  *   - disabled:text-ink-40, since WCAG 1.4.3 exempts inactive controls and a
  *     disabled control that reads as enabled is the worse defect
+ *   - the token named inside a comment, which colours nothing
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -39,10 +40,31 @@ for (const path of walk(ROOT)) {
   if (ALLOWED_FILES.has(path)) continue;
 
   const lines = readFileSync(path, "utf8").split("\n");
+  let inBlockComment = false;
+
   lines.forEach((line, index) => {
-    if (!line.includes("text-ink-40")) return;
+    // Comments are stripped before matching. Naming the token while explaining
+    // why something avoids it is not a use of it, and a checker that cannot
+    // tell the difference pushes people towards writing less about the rule.
+    let code = line;
+    if (inBlockComment) {
+      const close = code.indexOf("*/");
+      if (close === -1) return;
+      inBlockComment = false;
+      code = code.slice(close + 2);
+    }
+    code = code.replace(/\/\*.*?\*\//g, "");
+    const open = code.indexOf("/*");
+    if (open !== -1) {
+      inBlockComment = true;
+      code = code.slice(0, open);
+    }
+    code = code.replace(/\/\/.*$/, "");
+    // JSX comments are a block comment inside braces, already handled above.
+
+    if (!code.includes("text-ink-40")) return;
     // A disabled variant is permitted; a bare one is not.
-    const bare = line.replace(/disabled:text-ink-40/g, "");
+    const bare = code.replace(/disabled:text-ink-40/g, "");
     if (!bare.includes("text-ink-40")) return;
     offences.push({
       file: relative(".", path).split(sep).join("/"),
