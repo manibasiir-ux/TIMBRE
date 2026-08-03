@@ -128,6 +128,21 @@ test.describe("reduced motion", () => {
    * the preference, which no automated surface available here can do.
    */
 
+  test("the service ticker does not run", async ({ page }) => {
+    await visit(page, "/");
+
+    // A line of text sliding sideways forever is the clearest decorative
+    // motion on the page. §10 stops it, and the names still have to be there.
+    const ticker = page.getByRole("region", { name: /what we make/i });
+    const track = ticker.locator("div").first();
+    const transform = await track.evaluate(
+      (element) => getComputedStyle(element).transform,
+    );
+    expect(["none", "matrix(1, 0, 0, 1, 0, 0)"]).toContain(transform);
+
+    await expect(ticker.getByText("Sonic mnemonic").first()).toBeVisible();
+  });
+
   test("every route still renders its heading", async ({ page }) => {
     for (const route of ROUTES) {
       await visit(page, route.path);
