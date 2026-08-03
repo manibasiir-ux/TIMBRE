@@ -18,6 +18,7 @@ function signature(identity: SculptureIdentity): string {
     identity.swell,
     identity.warmth,
     identity.patina,
+    identity.elongation,
   ].join("/");
 }
 
@@ -56,8 +57,8 @@ describe("sculpture identities", () => {
     // the one that moves it most, so 2.0 is a real ceiling rather than a round
     // number.
     for (const identity of Object.values(SCULPTURE_IDENTITIES)) {
-      expect(identity.frequency).toBeGreaterThanOrEqual(1.0);
-      expect(identity.frequency).toBeLessThanOrEqual(2.4);
+      expect(identity.frequency).toBeGreaterThanOrEqual(0.9);
+      expect(identity.frequency).toBeLessThanOrEqual(2.8);
       expect(identity.ripple).toBeGreaterThanOrEqual(0);
       expect(identity.ripple).toBeLessThanOrEqual(2.0);
       expect(identity.swell).toBeGreaterThanOrEqual(0.8);
@@ -66,7 +67,21 @@ describe("sculpture identities", () => {
       expect(identity.warmth).toBeLessThanOrEqual(1);
       expect(identity.patina).toBeGreaterThanOrEqual(0);
       expect(identity.patina).toBeLessThanOrEqual(1);
+      expect(identity.elongation).toBeGreaterThanOrEqual(0.7);
+      expect(identity.elongation).toBeLessThanOrEqual(1.35);
     }
+  });
+
+  it("gives the set a silhouette worth morphing between", () => {
+    // The first tuning changed only the surface, and the four rendered heights
+    // came out 461, 473, 470 and 456 pixels — a spread of 4%, which nobody can
+    // see. Elongation is what makes the outline differ, so it is the one
+    // parameter with a floor on how far apart the values have to be.
+    const stretches = Object.values(SCULPTURE_IDENTITIES).map(
+      (identity) => identity.elongation,
+    );
+    const spread = Math.max(...stretches) / Math.min(...stretches);
+    expect(spread).toBeGreaterThan(1.5);
   });
 
   it("falls back to neutral for an unknown slug", () => {

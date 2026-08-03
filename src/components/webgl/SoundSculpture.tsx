@@ -214,7 +214,14 @@ export function SoundSculpture({
       if (!reducedMotion) {
         mesh.current.rotation.y = idleRotation.current + sculptureMotion.orbit;
       }
-      mesh.current.scale.setScalar(receded.scale);
+
+      // Recede scales the whole form; elongation stretches it. Lateral axes
+      // take the inverse square root so volume stays roughly constant and a
+      // tall case does not simply become a bigger one — the silhouette should
+      // change character, not size.
+      const stretch = Math.max(0.1, activeIdentity.elongation);
+      const lateral = receded.scale / Math.sqrt(stretch);
+      mesh.current.scale.set(lateral, receded.scale * stretch, lateral);
     }
   });
 

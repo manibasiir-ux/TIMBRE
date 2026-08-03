@@ -34,25 +34,34 @@ import { PALETTE } from "@/lib/color/palette";
  *
  * | 1280x800            | tinted | saturated |
  * |---------------------|--------|-----------|
- * | neutral, hero       | 2.10%  | 0.46%     |
- * | kestrel             | 2.32%  | 0.20%     |
- * | **halcyon**         | **3.15%** | 0.65%  |
- * | solene              | 0.21%  | 0.00%     |
- * | aviation-carrier    | 2.80%  | 0.27%     |
+ * | kestrel             | 1.35%  | 0.02%     |
+ * | **halcyon**         | **3.13%** | 0.25%  |
+ * | solene              | 3.00%  | 0.53%     |
+ * | aviation-carrier    | 1.34%  | 0.12%     |
  *
- * | 375x812             | tinted | saturated |
+ * | 427x925             | tinted | saturated |
  * |---------------------|--------|-----------|
- * | halcyon             | 1.01%  | 0.02%     |
- * | aviation-carrier    | 2.84%  | 0.31%     |
+ * | halcyon             | 1.92%  | 0.21%     |
+ * | solene              | 0.57%  | 0.00%     |
  *
- * Halcyon is the ceiling at 3.15%, which is where its ripple of 1.9 lands — the
+ * Halcyon is the ceiling at 3.13%, which is where its ripple of 2.0 lands — the
  * standing wave lights more of the surface than the noise field does. It is the
- * value to re-measure before anyone raises a ripple above 2.
+ * value to re-measure before anyone raises a ripple further.
  *
- * Solene reaches only 0.771 of full displacement, so it never saturates at all.
- * That is the ramp doing its job rather than a tuning accident: swell folds into
- * the gain the ramp is derived from, so the widest form in the set also has the
- * highest threshold.
+ * ## Measured silhouettes
+ *
+ * The point of the elongation axis, at 1280x800, in rendered pixels:
+ *
+ * | case             | width | height | aspect |
+ * |------------------|-------|--------|--------|
+ * | kestrel          | 724   | 979    | 1.35   |
+ * | halcyon          | 827   | 842    | 1.02   |
+ * | solene           | 1034  | 618    | 0.60   |
+ * | aviation-carrier | 826   | 913    | 1.11   |
+ *
+ * Against the first tuning's 461, 473, 470 and 456 — four heights inside 4% of
+ * each other, which is a morph that measures and does not read. The aspect now
+ * spans 0.60 to 1.35.
  */
 
 export type SculptureIdentity = {
@@ -75,6 +84,24 @@ export type SculptureIdentity = {
   warmth: number;
   /** Accent colour: 0 is `signal`, 1 is `signal-dim`. */
   patina: number;
+  /**
+   * Vertical stretch. 1 is the sphere; above it the form is tall and narrow,
+   * below it low and wide.
+   *
+   * The other four parameters all change the *surface* — how fine the noise is,
+   * how much it ripples, how far it swells, what colour it lands on — and the
+   * silhouette barely moves. Measured across the four cases the rendered
+   * heights were 461, 473, 470 and 456 pixels: a 4% spread, which is to say
+   * none. Swell cannot do this job either, because it folds into the gain the
+   * signal ramp is derived from, so a swollen form raises its own threshold and
+   * comes back the same size. Elongation is the one axis that changes the shape
+   * rather than its skin.
+   *
+   * Applied as a mesh scale of (1/sqrt(e), e, 1/sqrt(e)), which holds volume
+   * roughly constant so the accent budget moves with the square root rather
+   * than the cube of it.
+   */
+  elongation: number;
 };
 
 /** The calibrated baseline — what the sculpture is everywhere outside the rail. */
@@ -84,6 +111,7 @@ export const NEUTRAL_IDENTITY: SculptureIdentity = {
   swell: 1,
   warmth: 0,
   patina: 0,
+  elongation: 1,
 };
 
 /**
@@ -99,46 +127,52 @@ export const SCULPTURE_IDENTITIES: Readonly<
   Record<string, SculptureIdentity>
 > = {
   // "The tone has to resolve before the animation does." Short, exact, cool.
-  // Fine noise and almost no ripple read as precision; full signal because
-  // nothing about this engagement is withheld.
+  // The tallest and narrowest form in the set, finely detailed and barely
+  // rippling: precision reads as a tight column. Full signal, because nothing
+  // about this engagement is withheld.
   kestrel: {
-    frequency: 2.3,
-    ripple: 0.45,
+    frequency: 2.6,
+    ripple: 0.35,
     swell: 0.85,
     warmth: 0,
     patina: 0,
+    elongation: 1.3,
   },
 
   // "Recognisable from its rhythm alone", carried in the mids because low
-  // frequency disappears under road noise. The mid band is what the standing
-  // wave is, so this is the one identity that leans on ripple.
+  // frequency disappears under road noise. The mid band is the standing wave,
+  // so this is the identity that leans hardest on ripple, and it keeps the
+  // sphere's proportions — the rhythm is the character, not the outline.
   halcyon: {
     frequency: 1.9,
-    ripple: 1.9,
+    ripple: 2.0,
     swell: 1.0,
-    warmth: 0.15,
-    patina: 0.1,
+    warmth: 0.22,
+    patina: 0.28,
+    elongation: 1.0,
   },
 
   // Eight and ten minute beds at -22 to -26 LUFS across thirty-one hotels.
-  // Broad slow forms, minimal surface detail, and the warmest body in the set —
+  // The widest and lowest form, coarse and slow, and by far the warmest body:
   // hospitality is the only sector here that is literally about a room.
   solene: {
-    frequency: 1.15,
-    ripple: 0.3,
+    frequency: 0.95,
+    ripple: 0.25,
     swell: 1.25,
-    warmth: 0.7,
-    patina: 0.35,
+    warmth: 0.9,
+    patina: 0.58,
+    elongation: 0.76,
   },
 
   // Anonymised until March. The dimmest accent in the set, which is the one
-  // place the palette gets to say something the copy cannot.
+  // place the palette says something the copy cannot.
   "aviation-carrier": {
-    frequency: 1.45,
-    ripple: 0.9,
+    frequency: 1.4,
+    ripple: 1.0,
     swell: 1.1,
-    warmth: 0.4,
-    patina: 0.6,
+    warmth: 0.5,
+    patina: 0.85,
+    elongation: 1.12,
   },
 };
 
@@ -172,6 +206,8 @@ export function lerpIdentity(
     swell: from.swell + (to.swell - from.swell) * k,
     warmth: from.warmth + (to.warmth - from.warmth) * k,
     patina: from.patina + (to.patina - from.patina) * k,
+    elongation:
+      from.elongation + (to.elongation - from.elongation) * k,
   };
 }
 
