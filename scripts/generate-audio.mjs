@@ -103,12 +103,27 @@ function synthesiseBed(seconds, seed = 1) {
   // bass-driven swell would have gone nearly static. Comfort and movement are
   // not the same axis — glare lives in the high partials, and motion lives in
   // the low ones. The lows keep their depth, the highs lose theirs.
+  // Third tuning, and this one is about what the notes are rather than how
+  // loud they are. The bed was a cluster, not a chord, and two partials were
+  // doing the damage.
+  //
+  // 41.25 Hz is 55 x 3/4 — a fourth *below* the fundamental, which implies a
+  // root of 13.75 and leaves the ear unable to settle on what it is hearing.
+  // And 554 is not a harmonic of 55 at all; the tenth is 550. Four cycles a
+  // second apart, those two beat against each other continuously, and a slow
+  // beat under a held tone is precisely the thing that stops a drone being
+  // restful. Neither is loud. Both are why it never felt calm.
+  //
+  // What is left is a pure harmonic series on 55 Hz — 1, 2, 3, 4, 5, 6, 8, 10,
+  // 12, 16, 24, 32, 40, 48 — so every partial is consonant with every other by
+  // construction and nothing beats. The fifth harmonic is new and is the major
+  // third: it is what turns a stack of octaves and fifths into something with
+  // warmth rather than something merely open.
   const partials = [
     // Low, 20-250 Hz: the weight, and where the movement is allowed to live
-    { hz: 41.25, gain: 0.34, lfo: 0.5 / seconds, depth: 0.45 },
-    { hz: 55, gain: 0.42, lfo: 1 / seconds, depth: 0.5 },
-    { hz: 110, gain: 0.26, lfo: 1.5 / seconds, depth: 0.45 },
-    { hz: 165, gain: 0.15, lfo: 2 / seconds, depth: 0.4 },
+    { hz: 55, gain: 0.46, lfo: 0.5 / seconds, depth: 0.5 },
+    { hz: 110, gain: 0.3, lfo: 1 / seconds, depth: 0.48 },
+    { hz: 165, gain: 0.17, lfo: 1.5 / seconds, depth: 0.44 },
     // Mid, 250-2000 Hz: the body.
     //
     // Depth here is doing a different job from depth in the lows. Quietening
@@ -123,13 +138,14 @@ function synthesiseBed(seconds, seed = 1) {
     // one place coherence is wanted: the sculpture reads total band energy, and
     // total band energy is exactly what independent modulation flattens.
     { hz: 220, gain: 0.15, lfo: 1.5 / seconds, depth: 0.46 },
-    { hz: 330, gain: 0.14, lfo: 2.5 / seconds, depth: 0.44 },
-    { hz: 440, gain: 0.11, lfo: 1.5 / seconds, depth: 0.44 },
-    { hz: 554, gain: 0.085, lfo: 1.5 / seconds, depth: 0.42 },
-    { hz: 660, gain: 0.075, lfo: 2.5 / seconds, depth: 0.42 },
-    { hz: 880, gain: 0.055, lfo: 1.5 / seconds, depth: 0.4 },
-    { hz: 1320, gain: 0.038, lfo: 2.5 / seconds, depth: 0.4 },
-    { hz: 1760, gain: 0.026, lfo: 1.5 / seconds, depth: 0.38 },
+    { hz: 275, gain: 0.11, lfo: 2.5 / seconds, depth: 0.44 },
+    { hz: 330, gain: 0.12, lfo: 2.5 / seconds, depth: 0.44 },
+    { hz: 440, gain: 0.09, lfo: 1.5 / seconds, depth: 0.44 },
+    { hz: 550, gain: 0.062, lfo: 1.5 / seconds, depth: 0.42 },
+    { hz: 660, gain: 0.05, lfo: 2.5 / seconds, depth: 0.42 },
+    { hz: 880, gain: 0.034, lfo: 1.5 / seconds, depth: 0.4 },
+    { hz: 1320, gain: 0.02, lfo: 2.5 / seconds, depth: 0.4 },
+    { hz: 1760, gain: 0.013, lfo: 1.5 / seconds, depth: 0.38 },
     // High, 2000-8000 Hz: a suggestion of presence. The band's movement does
     // not come from here — see the air below.
     { hz: 2200, gain: 0.012, lfo: 1.5 / seconds, depth: 0.5 },
@@ -182,52 +198,35 @@ function synthesiseBed(seconds, seed = 1) {
 }
 
 /**
- * Short per-case stem: a chord with a character, not a harmonic stack.
+ * Short per-case stem: a different tonal centre, same construction.
  *
- * The first version stacked partials 1, 2, 3, 4, 6 and 8 of a root, which is
- * most of a sawtooth: at a 293 Hz root the eighth partial lands at 2.3 kHz and
- * the result buzzes rather than rings. It also added `(random() * 2 - 1) * 0.01`
- * of unfiltered white noise to every sample, which is the wind heard under each
- * case — broadband hiss, straight over the top of the tone.
+ * The tonal character here is the original one and is deliberately left alone.
+ * It was briefly replaced with per-case chords in just intonation, which was a
+ * change nobody asked for — the stems were fine.
  *
- * The noise is gone entirely. Purity was the point: a studio that sells sonic
- * identity cannot audition its work through a layer of hiss. What is left is a
- * set of intervals chosen per case, weighted so the fundamental carries and
- * everything above it supports rather than competes.
- *
- * Every frequency is rounded to a whole number of cycles across the stem, so
- * the loop closes without a click. `voices` are ratios against the root, which
- * is what lets each case have a different chord rather than a different pitch
- * of the same one.
+ * One thing did not go back: `(random() * 2 - 1) * 0.01`, a per-sample dusting
+ * of unfiltered white noise straight over the tone. That is the wind audible
+ * under each case, and a studio that sells sonic identity cannot audition its
+ * work through hiss.
  */
-function synthesiseStem(seconds, rootHz, voices) {
+function synthesiseStem(seconds, rootHz) {
   const n = Math.floor(seconds * SAMPLE_RATE);
   const out = new Float64Array(n);
-
-  // A cycle count rather than a frequency: an integer here is the guarantee
-  // that the waveform arrives back where it started.
-  const tuned = voices.map(({ ratio, gain, lfo }) => ({
-    cycles: Math.max(1, Math.round(rootHz * ratio * seconds)),
-    gain,
-    lfo,
-  }));
+  const partials = [1, 2, 3, 4, 6, 8];
 
   for (let i = 0; i < n; i += 1) {
     const t = i / SAMPLE_RATE;
-    const phase = t / seconds;
     let sample = 0;
 
-    for (const { cycles, gain, lfo } of tuned) {
-      // Shallow, slow, and different per voice, so the chord breathes from the
-      // inside instead of pulsing as one block.
-      const swing = 0.78 + 0.22 * Math.sin(2 * Math.PI * lfo * phase);
-      sample += Math.sin(2 * Math.PI * cycles * phase) * gain * swing;
-    }
+    partials.forEach((multiple, index) => {
+      const hz = Math.round(rootHz * multiple);
+      const gain = 0.4 / (index + 1);
+      const depth =
+        0.5 + 0.5 * Math.sin(2 * Math.PI * ((index + 1) / seconds) * t);
+      sample += Math.sin(2 * Math.PI * hz * t) * gain * depth;
+    });
 
-    // A single arc over the whole stem, zero at both ends. It loops silently by
-    // construction, and it gives each case an arrival rather than a switch.
-    sample *= Math.pow(Math.sin(Math.PI * phase), 1.4);
-
+    sample *= 0.7 + 0.3 * Math.sin(2 * Math.PI * (2 / seconds) * t);
     out[i] = sample;
   }
 
@@ -508,71 +507,11 @@ function bakeEnvelope(samples) {
  * ------------------------------------------------------------------ */
 
 const BED_SECONDS = 16;
-
-/**
- * A chord per case, chosen to say what the case study says.
- *
- * Ratios are just intonation rather than equal temperament — 3/2, 5/4, 9/8 and
- * so on — because these are sustained tones with no other instrument to be in
- * tune with, and pure ratios beat far less than tempered ones. Beating is what
- * makes a held chord feel restless.
- */
 const STEMS = [
-  {
-    // Kestrel: a payment confirming. An octave and a fifth, nothing ambiguous.
-    id: "kestrel",
-    rootHz: 220,
-    seconds: 8,
-    voices: [
-      { ratio: 1, gain: 0.5, lfo: 1 },
-      { ratio: 2, gain: 0.26, lfo: 1.5 },
-      { ratio: 3, gain: 0.12, lfo: 2 },
-      { ratio: 4, gain: 0.05, lfo: 2.5 },
-      { ratio: 6, gain: 0.02, lfo: 3 },
-    ],
-  },
-  {
-    // Halcyon: a vehicle waking. A suspended fourth resolving nowhere, which
-    // is what a start-up chime is — an opening, not a full stop.
-    id: "halcyon",
-    rootHz: 165,
-    seconds: 8,
-    voices: [
-      { ratio: 1, gain: 0.46, lfo: 1 },
-      { ratio: 4 / 3, gain: 0.22, lfo: 1.5 },
-      { ratio: 2, gain: 0.2, lfo: 2 },
-      { ratio: 8 / 3, gain: 0.08, lfo: 2.5 },
-      { ratio: 4, gain: 0.03, lfo: 3.5 },
-    ],
-  },
-  {
-    // Solene: a lobby at low volume. A major ninth, wide and unhurried, with
-    // the weight an octave below everything else.
-    id: "solene",
-    rootHz: 146.5,
-    seconds: 8,
-    voices: [
-      { ratio: 1, gain: 0.52, lfo: 0.5 },
-      { ratio: 3 / 2, gain: 0.2, lfo: 1 },
-      { ratio: 2, gain: 0.18, lfo: 1.5 },
-      { ratio: 9 / 4, gain: 0.07, lfo: 2 },
-      { ratio: 3, gain: 0.03, lfo: 2.5 },
-    ],
-  },
-  {
-    // The carrier: boarding a national airline. A minor third under a fifth —
-    // formal, and the only chord in the set that is not entirely bright.
-    id: "aviation",
-    rootHz: 196,
-    seconds: 8,
-    voices: [
-      { ratio: 1, gain: 0.48, lfo: 1 },
-      { ratio: 6 / 5, gain: 0.18, lfo: 1.5 },
-      { ratio: 3 / 2, gain: 0.16, lfo: 2 },
-      { ratio: 2, gain: 0.14, lfo: 2.5 },
-      { ratio: 3, gain: 0.04, lfo: 3 },
-    ],
-  },
+  { id: "kestrel", rootHz: 220, seconds: 8 },
+  { id: "halcyon", rootHz: 165, seconds: 8 },
+  { id: "solene", rootHz: 293, seconds: 8 },
+  { id: "aviation", rootHz: 196, seconds: 8 },
 ];
 
 function main() {
@@ -596,9 +535,9 @@ function main() {
     `  bed.wav            ${BED_SECONDS}s  ${bed.measured.toFixed(2)} LUFS`,
   );
 
-  for (const { id, rootHz, seconds, voices } of STEMS) {
+  for (const { id, rootHz, seconds } of STEMS) {
     const stem = normaliseToLufs(
-      synthesiseStem(seconds, rootHz, voices),
+      synthesiseStem(seconds, rootHz),
       TARGET_LUFS,
     );
     writeFileSync(
