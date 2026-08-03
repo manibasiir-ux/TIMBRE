@@ -109,24 +109,50 @@ function synthesiseBed(seconds, seed = 1) {
     { hz: 55, gain: 0.42, lfo: 1 / seconds, depth: 0.5 },
     { hz: 110, gain: 0.26, lfo: 1.5 / seconds, depth: 0.45 },
     { hz: 165, gain: 0.15, lfo: 2 / seconds, depth: 0.4 },
-    // Mid, 250-2000 Hz: the body
-    { hz: 220, gain: 0.15, lfo: 2.5 / seconds, depth: 0.32 },
-    { hz: 330, gain: 0.14, lfo: 1.5 / seconds, depth: 0.3 },
-    { hz: 440, gain: 0.11, lfo: 3.5 / seconds, depth: 0.3 },
-    { hz: 554, gain: 0.085, lfo: 2.5 / seconds, depth: 0.28 },
-    { hz: 660, gain: 0.075, lfo: 2 / seconds, depth: 0.28 },
-    { hz: 880, gain: 0.055, lfo: 4.5 / seconds, depth: 0.25 },
-    { hz: 1320, gain: 0.038, lfo: 3 / seconds, depth: 0.25 },
-    { hz: 1760, gain: 0.026, lfo: 6 / seconds, depth: 0.22 },
-    // High, 2000-8000 Hz: enough for the band to move, no more
-    { hz: 2200, gain: 0.019, lfo: 5.5 / seconds, depth: 0.3 },
-    { hz: 2640, gain: 0.014, lfo: 4 / seconds, depth: 0.3 },
-    { hz: 3300, gain: 0.01, lfo: 6.5 / seconds, depth: 0.28 },
+    // Mid, 250-2000 Hz: the body.
+    //
+    // Depth here is doing a different job from depth in the lows. Quietening
+    // this band for calm took its movement with it and the envelope's mid range
+    // fell to 18 against the 20 the sculpture needs. Depth is variation, not
+    // energy: these move more than they used to while being no brighter, which
+    // is the only way to have both.
+    // Two rates, not eight. Eight partials each drifting on their own rate
+    // cancel in aggregate — raising every depth moved the band's range from 18
+    // to 19 and no further, because while one partial rose another fell. In
+    // two groups they reinforce, so the band breathes as a body. This is the
+    // one place coherence is wanted: the sculpture reads total band energy, and
+    // total band energy is exactly what independent modulation flattens.
+    { hz: 220, gain: 0.15, lfo: 1.5 / seconds, depth: 0.46 },
+    { hz: 330, gain: 0.14, lfo: 2.5 / seconds, depth: 0.44 },
+    { hz: 440, gain: 0.11, lfo: 1.5 / seconds, depth: 0.44 },
+    { hz: 554, gain: 0.085, lfo: 1.5 / seconds, depth: 0.42 },
+    { hz: 660, gain: 0.075, lfo: 2.5 / seconds, depth: 0.42 },
+    { hz: 880, gain: 0.055, lfo: 1.5 / seconds, depth: 0.4 },
+    { hz: 1320, gain: 0.038, lfo: 2.5 / seconds, depth: 0.4 },
+    { hz: 1760, gain: 0.026, lfo: 1.5 / seconds, depth: 0.38 },
+    // High, 2000-8000 Hz: a suggestion of presence. The band's movement does
+    // not come from here — see the air below.
+    { hz: 2200, gain: 0.012, lfo: 1.5 / seconds, depth: 0.5 },
+    { hz: 2640, gain: 0.008, lfo: 1.5 / seconds, depth: 0.5 },
   ];
 
-  // A one-pole low pass on the noise. Flat noise to Nyquist is hiss; rolled off
-  // around 1.6 kHz it reads as room rather than as tape.
-  const noiseCoefficient = Math.exp((-2 * Math.PI * 1600) / SAMPLE_RATE);
+  // The air is what moves the high band, and it took three failed attempts to
+  // work out why.
+  //
+  // `averageBand` averages every FFT bin between 2 and 8 kHz — about 384 of
+  // them at this resolution — after converting each to decibels. Three pure
+  // tones occupy three bins; the remaining 381 sit at the floor and dominate
+  // the mean. Raising or deepening those tones moved the band's range from 6 to
+  // 8 against the 20 it needs, because tones cannot shift an average taken over
+  // hundreds of bins they are not in.
+  //
+  // Broadband noise is in all of them, which is why the original tuning passed
+  // and why removing its hiss broke this. The resolution is that the scale is
+  // logarithmic: quiet noise modulated deeply swings just as far in decibels as
+  // loud noise modulated shallowly. So the air is quieter than it has ever been
+  // and breathes almost to silence and back, which reads as a room rather than
+  // as tape while giving the sculpture a high band that genuinely moves.
+  const noiseCoefficient = Math.exp((-2 * Math.PI * 5000) / SAMPLE_RATE);
   let noiseState = 0;
 
   for (let i = 0; i < n; i += 1) {
@@ -143,11 +169,11 @@ function synthesiseBed(seconds, seed = 1) {
 
     // Air, itself modulated, so the high band breathes rather than sitting on
     // a constant noise floor.
-    const air = 0.45 + 0.55 * Math.sin(2 * Math.PI * (1.5 / seconds) * t) ** 2;
+    const air = 0.08 + 0.92 * Math.sin(2 * Math.PI * (1.5 / seconds) * t) ** 2;
     noiseState =
       noiseState * noiseCoefficient +
       (random() * 2 - 1) * (1 - noiseCoefficient);
-    sample += noiseState * 0.012 * air;
+    sample += noiseState * 0.0055 * air;
 
     out[i] = sample;
   }
@@ -155,26 +181,53 @@ function synthesiseBed(seconds, seed = 1) {
   return out;
 }
 
-/** Short per-case stem: a different tonal centre, same construction. */
-function synthesiseStem(seconds, rootHz, seed) {
+/**
+ * Short per-case stem: a chord with a character, not a harmonic stack.
+ *
+ * The first version stacked partials 1, 2, 3, 4, 6 and 8 of a root, which is
+ * most of a sawtooth: at a 293 Hz root the eighth partial lands at 2.3 kHz and
+ * the result buzzes rather than rings. It also added `(random() * 2 - 1) * 0.01`
+ * of unfiltered white noise to every sample, which is the wind heard under each
+ * case — broadband hiss, straight over the top of the tone.
+ *
+ * The noise is gone entirely. Purity was the point: a studio that sells sonic
+ * identity cannot audition its work through a layer of hiss. What is left is a
+ * set of intervals chosen per case, weighted so the fundamental carries and
+ * everything above it supports rather than competes.
+ *
+ * Every frequency is rounded to a whole number of cycles across the stem, so
+ * the loop closes without a click. `voices` are ratios against the root, which
+ * is what lets each case have a different chord rather than a different pitch
+ * of the same one.
+ */
+function synthesiseStem(seconds, rootHz, voices) {
   const n = Math.floor(seconds * SAMPLE_RATE);
   const out = new Float64Array(n);
-  const random = makeRandom(seed);
-  const partials = [1, 2, 3, 4, 6, 8];
+
+  // A cycle count rather than a frequency: an integer here is the guarantee
+  // that the waveform arrives back where it started.
+  const tuned = voices.map(({ ratio, gain, lfo }) => ({
+    cycles: Math.max(1, Math.round(rootHz * ratio * seconds)),
+    gain,
+    lfo,
+  }));
 
   for (let i = 0; i < n; i += 1) {
     const t = i / SAMPLE_RATE;
+    const phase = t / seconds;
     let sample = 0;
 
-    partials.forEach((multiple, index) => {
-      const hz = Math.round(rootHz * multiple);
-      const gain = 0.4 / (index + 1);
-      const depth = 0.5 + 0.5 * Math.sin(2 * Math.PI * ((index + 1) / seconds) * t);
-      sample += Math.sin(2 * Math.PI * hz * t) * gain * depth;
-    });
+    for (const { cycles, gain, lfo } of tuned) {
+      // Shallow, slow, and different per voice, so the chord breathes from the
+      // inside instead of pulsing as one block.
+      const swing = 0.78 + 0.22 * Math.sin(2 * Math.PI * lfo * phase);
+      sample += Math.sin(2 * Math.PI * cycles * phase) * gain * swing;
+    }
 
-    sample *= 0.7 + 0.3 * Math.sin(2 * Math.PI * (2 / seconds) * t);
-    sample += (random() * 2 - 1) * 0.01;
+    // A single arc over the whole stem, zero at both ends. It loops silently by
+    // construction, and it gives each case an arrival rather than a switch.
+    sample *= Math.pow(Math.sin(Math.PI * phase), 1.4);
+
     out[i] = sample;
   }
 
@@ -456,11 +509,70 @@ function bakeEnvelope(samples) {
 
 const BED_SECONDS = 16;
 
+/**
+ * A chord per case, chosen to say what the case study says.
+ *
+ * Ratios are just intonation rather than equal temperament — 3/2, 5/4, 9/8 and
+ * so on — because these are sustained tones with no other instrument to be in
+ * tune with, and pure ratios beat far less than tempered ones. Beating is what
+ * makes a held chord feel restless.
+ */
 const STEMS = [
-  { id: "kestrel", rootHz: 220, seconds: 8, seed: 11 },
-  { id: "halcyon", rootHz: 165, seconds: 8, seed: 22 },
-  { id: "solene", rootHz: 293, seconds: 8, seed: 33 },
-  { id: "aviation", rootHz: 196, seconds: 8, seed: 44 },
+  {
+    // Kestrel: a payment confirming. An octave and a fifth, nothing ambiguous.
+    id: "kestrel",
+    rootHz: 220,
+    seconds: 8,
+    voices: [
+      { ratio: 1, gain: 0.5, lfo: 1 },
+      { ratio: 2, gain: 0.26, lfo: 1.5 },
+      { ratio: 3, gain: 0.12, lfo: 2 },
+      { ratio: 4, gain: 0.05, lfo: 2.5 },
+      { ratio: 6, gain: 0.02, lfo: 3 },
+    ],
+  },
+  {
+    // Halcyon: a vehicle waking. A suspended fourth resolving nowhere, which
+    // is what a start-up chime is — an opening, not a full stop.
+    id: "halcyon",
+    rootHz: 165,
+    seconds: 8,
+    voices: [
+      { ratio: 1, gain: 0.46, lfo: 1 },
+      { ratio: 4 / 3, gain: 0.22, lfo: 1.5 },
+      { ratio: 2, gain: 0.2, lfo: 2 },
+      { ratio: 8 / 3, gain: 0.08, lfo: 2.5 },
+      { ratio: 4, gain: 0.03, lfo: 3.5 },
+    ],
+  },
+  {
+    // Solene: a lobby at low volume. A major ninth, wide and unhurried, with
+    // the weight an octave below everything else.
+    id: "solene",
+    rootHz: 146.5,
+    seconds: 8,
+    voices: [
+      { ratio: 1, gain: 0.52, lfo: 0.5 },
+      { ratio: 3 / 2, gain: 0.2, lfo: 1 },
+      { ratio: 2, gain: 0.18, lfo: 1.5 },
+      { ratio: 9 / 4, gain: 0.07, lfo: 2 },
+      { ratio: 3, gain: 0.03, lfo: 2.5 },
+    ],
+  },
+  {
+    // The carrier: boarding a national airline. A minor third under a fifth —
+    // formal, and the only chord in the set that is not entirely bright.
+    id: "aviation",
+    rootHz: 196,
+    seconds: 8,
+    voices: [
+      { ratio: 1, gain: 0.48, lfo: 1 },
+      { ratio: 6 / 5, gain: 0.18, lfo: 1.5 },
+      { ratio: 3 / 2, gain: 0.16, lfo: 2 },
+      { ratio: 2, gain: 0.14, lfo: 2.5 },
+      { ratio: 3, gain: 0.04, lfo: 3 },
+    ],
+  },
 ];
 
 function main() {
@@ -484,9 +596,9 @@ function main() {
     `  bed.wav            ${BED_SECONDS}s  ${bed.measured.toFixed(2)} LUFS`,
   );
 
-  for (const { id, rootHz, seconds, seed } of STEMS) {
+  for (const { id, rootHz, seconds, voices } of STEMS) {
     const stem = normaliseToLufs(
-      synthesiseStem(seconds, rootHz, seed),
+      synthesiseStem(seconds, rootHz, voices),
       TARGET_LUFS,
     );
     writeFileSync(
