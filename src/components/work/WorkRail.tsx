@@ -243,10 +243,31 @@ export function WorkRail() {
       // another sense. Every stem stays reachable, by name and on purpose, from
       // the case study each card links to.
       media.add("(prefers-reduced-motion: no-preference)", () => {
-        const distanceFor = () =>
-          Math.max(0, rail.scrollWidth - window.innerWidth);
-
         const cards = gsap.utils.toArray<HTMLElement>("[data-case-card]", root);
+
+        /**
+         * How far the track travels: exactly far enough to centre the last card.
+         *
+         * It was `scrollWidth - viewport`, which is the usual formula and is
+         * wrong here. Chrome omits a flex container's trailing padding from
+         * scrollWidth, so with the rail padded to centre its end cards the
+         * measurement came back 600px short of the content and the track
+         * stopped with the last card still 600px right of centre — near enough
+         * to look deliberate, far enough that it was never the nearest card and
+         * so never sounded.
+         *
+         * Stating the intent directly is both correct and self-documenting: the
+         * end of the scrub is where the last card is centred, whatever the
+         * padding does or does not report.
+         */
+        const distanceFor = () => {
+          const last = cards[cards.length - 1];
+          if (!last) return 0;
+          return Math.max(
+            0,
+            last.offsetLeft + last.offsetWidth / 2 - window.innerWidth / 2,
+          );
+        };
 
         /**
          * The card nearest the centre of the viewport at a given scrub progress.
@@ -279,6 +300,19 @@ export function WorkRail() {
         };
 
         let inside = false;
+        let active = -1;
+
+        /**
+         * Selects a card, once, when it becomes the nearest to centre.
+         *
+         * This runs on every scrub frame, so the index guard is what keeps it
+         * from restarting a stem and a 1.2s morph sixty times a second.
+         */
+        const selectCard = (index: number) => {
+          if (index === active) return;
+          active = index;
+          morphTo(index);
+        };
 
         // `inside` is checked before `timeline` is read: onRefresh fires while
         // the timeline is still being constructed, and touching the binding
@@ -287,7 +321,7 @@ export function WorkRail() {
           if (!inside) return;
           const trigger = timeline.scrollTrigger;
           if (!trigger) return;
-          morphTo(nearestCard(trigger.progress));
+          selectCard(nearestCard(trigger.progress));
         };
 
         const timeline = gsap.timeline({
@@ -299,8 +333,28 @@ export function WorkRail() {
             scrub: RAIL_SCRUB,
             anticipatePin: 1,
             invalidateOnRefresh: true,
-            // Only the morph index needs re-deriving after a refresh; presence
-            // is the observer's job below.
+            /**
+             * Which card is active is derived from the scrub itself.
+             *
+             * It was a ScrollTrigger per card with `start: "left center"`,
+             * firing as a card's left edge swept across the middle of the
+             * screen. That reads correctly and is geometrically wrong: the
+             * track only travels `scrollWidth - viewport`, and once the cards
+             * are wide relative to the viewport most of them never make that
+             * crossing at all. Measured on the deployed site at 1920x1080, the
+             * left edges reached centre at progress -0.72, -0.08, 0.56 and
+             * 1.21 — so of four cards exactly one, Solene, ever became active,
+             * and three never sounded. It survived review because the pane it
+             * was tested in was narrow enough for the geometry to work.
+             *
+             * Nearest-to-centre has no such dependency: some card is always
+             * nearest, at every width, so every card is reachable by
+             * construction.
+             */
+            onUpdate: (self) => {
+              if (!inside) return;
+              selectCard(nearestCard(self.progress));
+            },
             onRefresh: syncToRail,
           },
         });
@@ -329,8 +383,15 @@ export function WorkRail() {
         const presence = new IntersectionObserver(
           ([entry]) => {
             inside = entry.isIntersecting;
-            if (inside) syncToRail();
-            else leaveRail();
+            if (inside) {
+              syncToRail();
+              return;
+            }
+            // Forgetting the selection matters as much as stopping the sound:
+            // leaving and returning on the same card would otherwise find the
+            // index unchanged and never restart its stem or its morph.
+            active = -1;
+            leaveRail();
           },
           { threshold: 0 },
         );
@@ -341,16 +402,6 @@ export function WorkRail() {
           ease: "none",
         });
 
-        cards.forEach((card, index) => {
-          ScrollTrigger.create({
-            trigger: card,
-            containerAnimation: timeline,
-            start: "left center",
-            end: "right center",
-            onEnter: () => morphTo(index),
-            onEnterBack: () => morphTo(index),
-          });
-        });
 
         revealCard.current = (card) => {
           const trigger = timeline.scrollTrigger;
@@ -422,9 +473,21 @@ export function WorkRail() {
           </div>
         </div>
 
+        {/* The horizontal padding is half a viewport minus half a card, so the
+            first card begins centred and the last ends centred.
+
+            A flat 6vw looked equivalent and was not. The track travels
+            `scrollWidth - viewport`, which at 1920 with 720px cards is 1171px,
+            while the card centres span 2256px — so the sweep could only ever
+            bring the middle of the set past the middle of the screen. Measured
+            there, Kestrel and the carrier were never the nearest card at any
+            scroll position, which is why they never sounded and never morphed.
+            Sizing the padding to the viewport makes reaching every card a
+            property of the layout rather than a coincidence of how many cards
+            there are and how wide they happen to be. */}
         <ul
           ref={track}
-          className="flex shrink-0 items-stretch gap-8 px-[6vw] will-change-transform motion-reduce:flex-col motion-reduce:gap-10 motion-reduce:px-0 motion-reduce:will-change-auto"
+          className="flex shrink-0 items-stretch gap-8 px-[calc(50vw-min(40vw,360px))] will-change-transform motion-reduce:flex-col motion-reduce:gap-10 motion-reduce:px-0 motion-reduce:will-change-auto"
         >
           {FEATURED.map((entry, index) => {
             // Sounding, not merely centred: with sound declined or muted the

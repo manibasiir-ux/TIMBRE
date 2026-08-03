@@ -128,6 +128,57 @@ test.describe("work rail", () => {
     await expect(last).toBeInViewport();
   });
 
+  test("brings every card to the centre at some point in the scrub", async ({
+    page,
+  }) => {
+    /**
+     * The property that was missing, asserted as geometry so it holds without
+     * the container needing working audio.
+     *
+     * Which case is active is whichever card is nearest the centre. That is
+     * only meaningful if every card gets a turn, and for two commits it did
+     * not: the track travelled `scrollWidth - viewport` while the card centres
+     * spanned far more than that, so on a 1920 viewport only Solene was ever
+     * nearest and three of four cases never sounded or morphed. It read as one
+     * broken stem, which is how it was reported.
+     */
+    await visit(page, "/");
+
+    const coverage = await page.evaluate(() => {
+      const cards = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-case-card]"),
+      );
+      const last = cards[cards.length - 1];
+      const distance = Math.max(
+        0,
+        last.offsetLeft + last.offsetWidth / 2 - window.innerWidth / 2,
+      );
+      const centre = window.innerWidth / 2;
+
+      const nearest = new Set<number>();
+      for (let step = 0; step <= 100; step += 1) {
+        const trackX = -distance * (step / 100);
+        let best = 0;
+        let bestGap = Infinity;
+        cards.forEach((card, index) => {
+          const gap = Math.abs(
+            card.offsetLeft + card.offsetWidth / 2 + trackX - centre,
+          );
+          if (gap < bestGap) {
+            bestGap = gap;
+            best = index;
+          }
+        });
+        nearest.add(best);
+      }
+
+      return { cards: cards.length, reachable: nearest.size, distance };
+    });
+
+    expect(coverage.distance).toBeGreaterThan(0);
+    expect(coverage.reachable).toBe(coverage.cards);
+  });
+
   test("never sounds when the visitor declined audio", async ({ page }) => {
     // §6.1 item 5 auditions the centred card. FR-01 says nothing plays without
     // an explicit gesture, and a scroll is not one. The badge is set from what
