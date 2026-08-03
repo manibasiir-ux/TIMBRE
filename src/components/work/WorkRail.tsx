@@ -7,7 +7,6 @@ import { useEffect, useRef } from "react";
 
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 import { CASES } from "@/content/cases";
-import { sculptureMotion } from "@/lib/motion/sculptureMotion";
 import {
   MORPH_SECONDS,
   NEUTRAL_IDENTITY,
@@ -42,24 +41,12 @@ gsap.registerPlugin(ScrollTrigger);
 
 const FEATURED = CASES.filter((entry) => entry.featured);
 
-/**
- * How far the sculpture is pulled back while the rail holds the viewport.
- *
- * It arrives here fully receded, because the manifesto's scrub ends at 1 and
- * nothing since has moved it. At that value the colour mix is 0.15, so a morph
- * between two identities would be almost invisible — the feature would ship
- * technically working and visually absent. Partial recede keeps the accent
- * legible while still sitting the form behind the cards.
- */
-const RAIL_RECEDE = 0.25;
 /** §7 "Work rail": scrub 1.2, linear. */
 const RAIL_SCRUB = 1.2;
 
 export function WorkRail() {
   const section = useRef<HTMLElement>(null);
   const track = useRef<HTMLUListElement>(null);
-  /** Zero-height marker in normal flow, used to time the sculpture's return. */
-  const approach = useRef<HTMLDivElement>(null);
   /**
    * Scrolls a focused card into view, set from inside the GSAP context.
    *
@@ -162,41 +149,6 @@ export function WorkRail() {
           morphTo(nearestCard(trigger.progress));
         };
 
-        /**
-         * Brings the sculpture forward as the rail rises into view.
-         *
-         * This began as a one-shot tween fired on entering the rail, and it did
-         * not hold: `recede` already has an owner. The manifesto drives it to 1
-         * with a scrub, and a scrub keeps asserting its value, so a one-shot
-         * from somewhere else is overwritten the next time the scroll updates.
-         * Instrumented on the real page, the rail's tween ran exactly once at
-         * load and `recede` was back at 1 by the time anything was measured.
-         *
-         * Two scrubs over ranges that do not overlap is the fix, and it is the
-         * idiom the hero and the manifesto already use: the manifesto owns
-         * recede until the rail's top reaches the fold, this owns it from there
-         * to the pin. Neither ever writes while the other is authoritative.
-         */
-        const recedeScrub = gsap.fromTo(
-          sculptureMotion,
-          { recede: 1 },
-          {
-            recede: RAIL_RECEDE,
-            ease: "none",
-            scrollTrigger: {
-              // The marker, not the section. The section is pinned, and
-              // ScrollTrigger rewrites a pinned element's position to fixed
-              // inside a spacer — a second trigger measuring it gets positions
-              // that no longer describe where it sits in the document.
-              trigger: approach.current,
-              start: "top bottom",
-              end: "top top",
-              scrub: 1,
-              invalidateOnRefresh: true,
-            },
-          },
-        );
-
         const timeline = gsap.timeline({
           scrollTrigger: {
             trigger: root,
@@ -278,11 +230,8 @@ export function WorkRail() {
         return () => {
           revealCard.current = null;
           presence.disconnect();
-          recedeScrub.scrollTrigger?.kill();
-          recedeScrub.kill();
           timeline.scrollTrigger?.kill();
           timeline.kill();
-          sculptureMotion.recede = 1;
           leaveRail();
         };
       });
@@ -293,7 +242,11 @@ export function WorkRail() {
 
   return (
     <>
-      <div ref={approach} aria-hidden="true" className="h-px w-full" />
+      {/* A zero-height marker in normal flow. SculptureChoreography times the
+          sculpture's return off this rather than off the section, because the
+          section is pinned and a pinned element reports positions that no
+          longer describe where it sits in the document. */}
+      <div data-choreo="rail" aria-hidden="true" className="h-px w-full" />
 
       <section
         ref={section}

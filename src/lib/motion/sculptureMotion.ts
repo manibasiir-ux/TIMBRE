@@ -34,6 +34,55 @@ export const sculptureMotion: SculptureMotion = {
 /** How far scale and colour mix are pulled back at full recede. */
 export const RECEDE = { scale: 0.35, desaturate: 0.85 } as const;
 
+/**
+ * Where recede settles while the work rail holds the viewport.
+ *
+ * The rail arrives with the sculpture fully withdrawn behind the manifesto, and
+ * at recede 1 the colour mix is 0.15 — a morph between two case identities is
+ * then almost invisible. This brings the form back far enough to read while
+ * still sitting it behind the cards.
+ */
+export const RAIL_RECEDE = 0.25;
+
+/**
+ * The three phases of recede, as fractions of one scroll range.
+ *
+ * Withdraw behind the manifesto, hold while it is read, return for the rail.
+ */
+export const RECEDE_CURVE = { withdrawEnd: 0.35, holdEnd: 0.62 } as const;
+
+/**
+ * Recede at a point in the home page's sculpture range, §6.1 items 4 and 5.
+ *
+ * A pure function of one progress value, deliberately, because every previous
+ * attempt at this failed on coordination rather than on maths.
+ *
+ * Two scrub tweens cannot share a property: ScrollTrigger holds a scrubbed tween
+ * at progress 0 or 1 whenever the scroll sits outside its range and re-applies
+ * that value on every update, so the manifesto's tween and the rail's tween each
+ * stamped their own idea of recede over the other's. Measured down the page the
+ * result was not merely wrong but non-monotonic — 1.0 at the very top of the
+ * document, then 0.50, back to 1.0, then 0.80, 0.48. The sculpture sat at its
+ * most withdrawn exactly where §6.1 wants it most present, which hid the hero's
+ * whole scrub behind a fade nobody asked for.
+ *
+ * Splitting them onto two triggers driving two separate numbers fixed the
+ * fighting but not the coordination: their ranges have to abut, the offsets that
+ * make them abut depend on viewport height and on how tall the manifesto renders,
+ * and measured on a 702px viewport they still overlapped enough that recede
+ * peaked at 0.755 instead of 1. One range with explicit phases has no seam to
+ * get wrong, and unlike a pair of triggers it can be tested without a browser.
+ */
+export function recedeAt(progress: number): number {
+  const p = Math.min(1, Math.max(0, progress));
+  const { withdrawEnd, holdEnd } = RECEDE_CURVE;
+
+  if (p <= withdrawEnd) return p / withdrawEnd;
+  if (p <= holdEnd) return 1;
+
+  return 1 + (RAIL_RECEDE - 1) * ((p - holdEnd) / (1 - holdEnd));
+}
+
 /** Mesh scale and colour mix at a given recede amount. */
 export function recedeState(recede: number): { scale: number; mix: number } {
   const clamped = Math.min(1, Math.max(0, recede));

@@ -143,6 +143,30 @@ export function Hero() {
           are hidden so it is announced once as a sentence rather than three
           fragments — or, after splitting, character by character. */}
       <h1 className="relative" aria-label="We make brands audible">
+        {/* The lockup sits directly over the sculpture, and §6.1 gives the hero
+            that form at full scale and full colour. Measured against a lit peak
+            of 206,255,6 the three lines came out at 1.06, 1.06 and 1.05 to one,
+            against the 3:1 WCAG 2.2 asks of display type. It is the failure the
+            manifesto solves by receding, and the hero cannot recede without
+            giving up the one thing it exists to show.
+
+            So the scene is darkened under the words instead. A blurred solid
+            rather than a gradient, deliberately: a gradient's alpha where the
+            text happens to fall has to be reasoned about, while a solid inset
+            further than its own blur radius has a core that is provably opaque
+            ground, which makes the contrast under the text 17.84:1 by
+            construction and measurable as geometry. Everywhere without text
+            over it, the sculpture stays fully lit. */}
+        <span
+          aria-hidden="true"
+          data-hero-scrim
+          className="pointer-events-none absolute -z-10 block"
+          style={{
+            inset: "-72px",
+            background: "var(--color-ground)",
+            filter: "blur(40px)",
+          }}
+        />
         <span
           data-hero-line
           aria-hidden="true"

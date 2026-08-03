@@ -1,13 +1,79 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  RAIL_RECEDE,
+  RECEDE,
+  RECEDE_CURVE,
   SCULPTURE_SCROLL,
+  recedeAt,
+  recedeState,
   resetSculptureMotion,
   sculptureMotion,
   sculptureMotionAt,
-  recedeState,
-  RECEDE,
 } from "./sculptureMotion";
+
+describe("the recede curve down the home page", () => {
+  it("leaves the sculpture fully present as the range opens", () => {
+    // The defect this replaces: recede sat at 1 at scroll position zero, so the
+    // hero's own scrub — gain 1 to 2.4, orbit 0 to 0.9 — happened entirely
+    // behind a fade and nobody ever saw it.
+    expect(recedeAt(0)).toBe(0);
+  });
+
+  it("withdraws fully before the manifesto is read", () => {
+    expect(recedeAt(RECEDE_CURVE.withdrawEnd)).toBeCloseTo(1, 10);
+  });
+
+  it("holds at full withdraw while the copy is on screen", () => {
+    const mid =
+      (RECEDE_CURVE.withdrawEnd + RECEDE_CURVE.holdEnd) / 2;
+    expect(recedeAt(mid)).toBe(1);
+    expect(recedeAt(RECEDE_CURVE.holdEnd)).toBe(1);
+  });
+
+  it("returns to the rail's resting value by the end", () => {
+    expect(recedeAt(1)).toBeCloseTo(RAIL_RECEDE, 10);
+  });
+
+  it("never doubles back", () => {
+    // Two scrub tweens sharing the property produced 1.0, 0.50, 1.0, 0.80,
+    // 0.48 down the page. Monotonic-until-the-hold, then monotonic-down, is the
+    // property that was actually missing.
+    let previous = -Infinity;
+    for (let p = 0; p <= RECEDE_CURVE.holdEnd; p += 0.01) {
+      const value = recedeAt(p);
+      expect(value).toBeGreaterThanOrEqual(previous - 1e-9);
+      previous = value;
+    }
+
+    previous = Infinity;
+    for (let p = RECEDE_CURVE.holdEnd; p <= 1; p += 0.01) {
+      const value = recedeAt(p);
+      expect(value).toBeLessThanOrEqual(previous + 1e-9);
+      previous = value;
+    }
+  });
+
+  it("stays inside the range recedeState is defined over", () => {
+    for (let p = -0.5; p <= 1.5; p += 0.01) {
+      const value = recedeAt(p);
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("clamps rather than extrapolating", () => {
+    // ScrollTrigger hands back progress slightly outside 0..1 on a fast flick.
+    expect(recedeAt(-1)).toBe(0);
+    expect(recedeAt(2)).toBeCloseTo(RAIL_RECEDE, 10);
+  });
+
+  it("keeps the rail bright enough for a morph to read", () => {
+    // At recede 1 the colour mix is 0.15, which is where the per-case morph
+    // became invisible. The rail's resting value has to leave more than that.
+    expect(recedeState(recedeAt(1)).mix).toBeGreaterThan(0.5);
+  });
+});
 
 describe("scroll-linked sculpture motion", () => {
   beforeEach(() => {
