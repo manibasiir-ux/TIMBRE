@@ -84,44 +84,70 @@ function synthesiseBed(seconds, seed = 1) {
   // reading a noise floor, which makes two thirds of the sculpture's
   // displacement sit still. Every partial gets its own LFO rate so the bands
   // move independently rather than pumping together.
+  //
+  // This is the second tuning. The first put six partials between 2.2 and 7 kHz
+  // and a flat white-noise floor on top of them, which is the region the ear is
+  // most sensitive to and the reason the bed was tiring after a few minutes.
+  // Fatigue is not loudness — it was already at -16 LUFS — it is where the
+  // energy sits and how fast it moves.
+  //
+  // Three changes. The upper partials come down to a ceiling of 3.3 kHz and
+  // lose most of their gain, keeping enough above 2 kHz for the analyser's high
+  // band to have something to read without any of it landing in the glare. The
+  // low end gains a partial and takes more weight, so the bed has body to sit
+  // on rather than being all edge. And every modulation rate is halved, so it
+  // breathes at walking pace instead of shimmering.
+  // Depth is per band, not global. The first attempt at a calmer bed shallowed
+  // every modulation at once and the envelope test caught what that costs: the
+  // low band's range fell to 13 against the 20 it needs, so the sculpture's
+  // bass-driven swell would have gone nearly static. Comfort and movement are
+  // not the same axis — glare lives in the high partials, and motion lives in
+  // the low ones. The lows keep their depth, the highs lose theirs.
   const partials = [
-    // Low, 20-250 Hz: the weight
-    { hz: 55, gain: 0.4, lfo: 1 / seconds },
-    { hz: 110, gain: 0.22, lfo: 2 / seconds },
-    { hz: 165, gain: 0.12, lfo: 3 / seconds },
+    // Low, 20-250 Hz: the weight, and where the movement is allowed to live
+    { hz: 41.25, gain: 0.34, lfo: 0.5 / seconds, depth: 0.45 },
+    { hz: 55, gain: 0.42, lfo: 1 / seconds, depth: 0.5 },
+    { hz: 110, gain: 0.26, lfo: 1.5 / seconds, depth: 0.45 },
+    { hz: 165, gain: 0.15, lfo: 2 / seconds, depth: 0.4 },
     // Mid, 250-2000 Hz: the body
-    { hz: 330, gain: 0.16, lfo: 3 / seconds },
-    { hz: 440, gain: 0.14, lfo: 7 / seconds },
-    { hz: 554, gain: 0.12, lfo: 5 / seconds },
-    { hz: 660, gain: 0.12, lfo: 4 / seconds },
-    { hz: 880, gain: 0.1, lfo: 9 / seconds },
-    { hz: 1320, gain: 0.09, lfo: 6 / seconds },
-    { hz: 1760, gain: 0.07, lfo: 12 / seconds },
-    // High, 2000-8000 Hz: presence and air
-    { hz: 2200, gain: 0.07, lfo: 11 / seconds },
-    { hz: 2640, gain: 0.06, lfo: 8 / seconds },
-    { hz: 3520, gain: 0.055, lfo: 13 / seconds },
-    { hz: 4400, gain: 0.045, lfo: 10 / seconds },
-    { hz: 5280, gain: 0.04, lfo: 17 / seconds },
-    { hz: 7040, gain: 0.03, lfo: 14 / seconds },
+    { hz: 220, gain: 0.15, lfo: 2.5 / seconds, depth: 0.32 },
+    { hz: 330, gain: 0.14, lfo: 1.5 / seconds, depth: 0.3 },
+    { hz: 440, gain: 0.11, lfo: 3.5 / seconds, depth: 0.3 },
+    { hz: 554, gain: 0.085, lfo: 2.5 / seconds, depth: 0.28 },
+    { hz: 660, gain: 0.075, lfo: 2 / seconds, depth: 0.28 },
+    { hz: 880, gain: 0.055, lfo: 4.5 / seconds, depth: 0.25 },
+    { hz: 1320, gain: 0.038, lfo: 3 / seconds, depth: 0.25 },
+    { hz: 1760, gain: 0.026, lfo: 6 / seconds, depth: 0.22 },
+    // High, 2000-8000 Hz: enough for the band to move, no more
+    { hz: 2200, gain: 0.019, lfo: 5.5 / seconds, depth: 0.3 },
+    { hz: 2640, gain: 0.014, lfo: 4 / seconds, depth: 0.3 },
+    { hz: 3300, gain: 0.01, lfo: 6.5 / seconds, depth: 0.28 },
   ];
+
+  // A one-pole low pass on the noise. Flat noise to Nyquist is hiss; rolled off
+  // around 1.6 kHz it reads as room rather than as tape.
+  const noiseCoefficient = Math.exp((-2 * Math.PI * 1600) / SAMPLE_RATE);
+  let noiseState = 0;
 
   for (let i = 0; i < n; i += 1) {
     const t = i / SAMPLE_RATE;
     let sample = 0;
 
-    for (const { hz, gain, lfo } of partials) {
-      const depth = 0.5 + 0.5 * Math.sin(2 * Math.PI * lfo * t);
-      sample += Math.sin(2 * Math.PI * hz * t) * gain * depth;
+    for (const { hz, gain, lfo, depth } of partials) {
+      const swing = 1 - depth + depth * Math.sin(2 * Math.PI * lfo * t);
+      sample += Math.sin(2 * Math.PI * hz * t) * gain * swing;
     }
 
     // A slow swell so the low band has something to move against.
-    sample *= 0.75 + 0.25 * Math.sin(2 * Math.PI * (1 / seconds) * t);
+    sample *= 0.74 + 0.26 * Math.sin(2 * Math.PI * (0.5 / seconds) * t);
 
     // Air, itself modulated, so the high band breathes rather than sitting on
     // a constant noise floor.
-    const air = 0.3 + 0.7 * Math.sin(2 * Math.PI * (3 / seconds) * t) ** 2;
-    sample += (random() * 2 - 1) * 0.02 * air;
+    const air = 0.45 + 0.55 * Math.sin(2 * Math.PI * (1.5 / seconds) * t) ** 2;
+    noiseState =
+      noiseState * noiseCoefficient +
+      (random() * 2 - 1) * (1 - noiseCoefficient);
+    sample += noiseState * 0.012 * air;
 
     out[i] = sample;
   }

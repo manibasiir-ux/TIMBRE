@@ -69,7 +69,13 @@ export function useAudioAnalyser() {
     return onTick((_deltaMs, timeSeconds) => {
       if (start === null) start = timeSeconds;
 
-      if (audioEngine.isInitialised) {
+      // `isAudible`, not `isInitialised`. The analyser sits after the master
+      // gain, so a muted context is initialised and reading nothing, and this
+      // branch used to hand the sculpture silence: it stopped moving and went
+      // black the moment anyone pressed mute. The envelope covers every case
+      // where there is no signal to read — declined, paused or muted — so the
+      // form keeps its motion and only its colour changes.
+      if (audioEngine.isAudible) {
         const data = audioEngine.getFrequencyData();
         const next = computeBands(data, audioEngine.sampleRate, FFT_SIZE);
         target.low = next.low;

@@ -16,9 +16,13 @@ function signature(identity: SculptureIdentity): string {
     identity.frequency,
     identity.ripple,
     identity.swell,
-    identity.warmth,
-    identity.patina,
     identity.elongation,
+    identity.square,
+    identity.taper,
+    identity.solid,
+    identity.accentR,
+    identity.accentG,
+    identity.accentB,
   ].join("/");
 }
 
@@ -63,25 +67,68 @@ describe("sculpture identities", () => {
       expect(identity.ripple).toBeLessThanOrEqual(2.0);
       expect(identity.swell).toBeGreaterThanOrEqual(0.8);
       expect(identity.swell).toBeLessThanOrEqual(1.3);
-      expect(identity.warmth).toBeGreaterThanOrEqual(0);
-      expect(identity.warmth).toBeLessThanOrEqual(1);
-      expect(identity.patina).toBeGreaterThanOrEqual(0);
-      expect(identity.patina).toBeLessThanOrEqual(1);
       expect(identity.elongation).toBeGreaterThanOrEqual(0.7);
       expect(identity.elongation).toBeLessThanOrEqual(1.35);
+
+      for (const axis of [
+        identity.square,
+        identity.taper,
+        identity.solid,
+      ] as const) {
+        expect(axis).toBeGreaterThanOrEqual(0);
+        expect(axis).toBeLessThanOrEqual(1);
+      }
     }
   });
 
-  it("gives the set a silhouette worth morphing between", () => {
-    // The first tuning changed only the surface, and the four rendered heights
-    // came out 461, 473, 470 and 456 pixels — a spread of 4%, which nobody can
-    // see. Elongation is what makes the outline differ, so it is the one
-    // parameter with a floor on how far apart the values have to be.
-    const stretches = Object.values(SCULPTURE_IDENTITIES).map(
-      (identity) => identity.elongation,
+  it("gives each case a distinct solid", () => {
+    // Cube, cone, cylinder and pyramid are the four corners of (square, taper),
+    // so distinct shapes means distinct corners. Two cases landing on the same
+    // pair would render identically however different their colours were.
+    const corners = Object.values(SCULPTURE_IDENTITIES).map(
+      (identity) => `${identity.square}/${identity.taper}`,
     );
-    const spread = Math.max(...stretches) / Math.min(...stretches);
-    expect(spread).toBeGreaterThan(1.5);
+    expect(new Set(corners).size).toBe(corners.length);
+
+    // And every one of them is a solid rather than the sphere, which is the
+    // neutral state the rail morphs away from.
+    for (const identity of Object.values(SCULPTURE_IDENTITIES)) {
+      expect(identity.solid).toBe(1);
+    }
+    expect(NEUTRAL_IDENTITY.solid).toBe(0);
+  });
+
+  it("keeps the accents clear of the colours that carry meaning", () => {
+    // `ok` (#5BE3A5) marks success and `peak` (#FF4A1F) marks errors and
+    // clipping, including a brief form that fails validation. A sculpture
+    // wearing either would make those states ambiguous exactly where being
+    // unambiguous matters.
+    const reserved = [
+      [0x5b, 0xe3, 0xa5],
+      [0xff, 0x4a, 0x1f],
+    ];
+    const toByte = (linear: number) =>
+      Math.round(
+        (linear <= 0.0031308
+          ? linear * 12.92
+          : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055) * 255,
+      );
+
+    for (const identity of Object.values(SCULPTURE_IDENTITIES)) {
+      const rgb = [
+        toByte(identity.accentR),
+        toByte(identity.accentG),
+        toByte(identity.accentB),
+      ];
+      for (const other of reserved) {
+        const gap = Math.hypot(
+          rgb[0] - other[0],
+          rgb[1] - other[1],
+          rgb[2] - other[2],
+        );
+        expect(gap).toBeGreaterThan(60);
+      }
+    }
   });
 
   it("falls back to neutral for an unknown slug", () => {
@@ -101,7 +148,9 @@ describe("identity interpolation", () => {
   it("sits halfway at the midpoint", () => {
     const mid = lerpIdentity(a, b, 0.5);
     expect(mid.frequency).toBeCloseTo((a.frequency + b.frequency) / 2, 10);
-    expect(mid.warmth).toBeCloseTo((a.warmth + b.warmth) / 2, 10);
+    expect(mid.accentR).toBeCloseTo((a.accentR + b.accentR) / 2, 10);
+    // Cube to cylinder passes through every rounded-corner box between them.
+    expect(mid.square).toBeCloseTo((a.square + b.square) / 2, 10);
   });
 
   it("clamps rather than extrapolating", () => {

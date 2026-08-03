@@ -39,10 +39,16 @@ export const RECEDE = { scale: 0.35, desaturate: 0.85 } as const;
  *
  * The rail arrives with the sculpture fully withdrawn behind the manifesto, and
  * at recede 1 the colour mix is 0.15 — a morph between two case identities is
- * then almost invisible. This brings the form back far enough to read while
- * still sitting it behind the cards.
+ * then almost invisible.
+ *
+ * It sat at 0.25 and was still too far back: on the deployed site the shapes
+ * were technically changing and could not be seen doing it. The cards are
+ * opaque panels and the section heading has its own scrim, so nothing here is
+ * read against the sculpture, and it can come almost fully forward. 0.06 leaves
+ * just enough of a step to keep the rail feeling like a layer behind the work
+ * rather than the work floating on top of nothing.
  */
-export const RAIL_RECEDE = 0.25;
+export const RAIL_RECEDE = 0.06;
 
 /**
  * The three phases of recede, as fractions of one scroll range.

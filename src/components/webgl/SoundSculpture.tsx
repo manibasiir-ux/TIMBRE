@@ -10,10 +10,11 @@ import { useAudioAnalyser } from "@/lib/audio/useAudioAnalyser";
 import { SNOISE } from "@/lib/glsl/snoise";
 import { recedeState, sculptureMotion } from "@/lib/motion/sculptureMotion";
 import {
-  IDENTITY_COLOURS,
   NEUTRAL_IDENTITY,
+  SILENT_RGB,
   activeIdentity,
 } from "@/lib/webgl/sculptureIdentity";
+import { selectAudible, useExperience } from "@/store/useExperience";
 import {
   DISPLACEMENT,
   SCULPTURE_RADIUS,
@@ -47,28 +48,68 @@ const vertexShader = /* glsl */ `
   uniform float uGain;
   uniform float uFrequency;
   uniform float uRipple;
+  uniform float uSquare;
+  uniform float uTaper;
+  uniform float uSolid;
 
   varying float vDisp;
 
   ${SNOISE}
 
-  void main() {
-    vec3 p = position;
+  /**
+   * Where a direction leaves a capped solid of unit half-extent.
+   *
+   * The solid is described by two numbers: how square its cross-section is, and
+   * how far it tapers toward the top. Cube, cylinder, cone and pyramid are the
+   * four corners of that pair, and every value between them is a real shape.
+   *
+   * For a direction d the surface is the nearer of two intersections — the
+   * tapered side wall, and the flat cap at y = ±1 — so the whole family reduces
+   * to one min(). The side solves
+   *
+   *   t * radial = 1 - taper * (t * d.y + 1) / 2
+   *
+   * for t, which is where the ray meets a wall whose radius falls linearly with
+   * height. A denominator at or below zero means the ray runs parallel to that
+   * wall or away from it, and only the cap applies.
+   */
+  float solidScale(vec3 d) {
+    float round_ = length(d.xz);
+    float square = max(abs(d.x), abs(d.z));
+    float radial = mix(round_, square, uSquare);
 
-    float n = snoise(p * uFrequency + uTime * 0.18);
+    float denom = radial + uTaper * d.y * 0.5;
+    float side = denom > 1e-4 ? (1.0 - uTaper * 0.5) / denom : 1e4;
+    float cap = 1.0 / max(abs(d.y), 1e-4);
+
+    return min(side, cap);
+  }
+
+  void main() {
+    vec3 dir = normalize(position);
+
+    // Noise is sampled on the sphere, not on the morphed surface, so the
+    // texture stays put on the form instead of swimming across it as the shape
+    // changes underneath.
+    float n = snoise(position * uFrequency + uTime * 0.18);
     float disp = n * (${DISPLACEMENT.base} + uLow * ${DISPLACEMENT.lowGain}) * uGain
-               + sin(p.y * 14.0 + uTime * 3.0) * uMid * ${DISPLACEMENT.midGain} * uRipple
+               + sin(position.y * 14.0 + uTime * 3.0) * uMid * ${DISPLACEMENT.midGain} * uRipple
                + uHigh * ${DISPLACEMENT.highGain};
 
     vDisp = disp;
-    p += normal * disp;
 
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    vec3 shaped = mix(dir, dir * solidScale(dir), uSolid) * ${SCULPTURE_RADIUS.toFixed(2)};
+    shaped += dir * disp;
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(shaped, 1.0);
   }
 `;
 
 // The ramp is a uniform rather than a constant because it has to track the
 // scroll-linked displacement gain; see signalRampFor.
+// uBase and uSignal are vec3 of linear RGB rather than THREE.Color, because the
+// identities now carry arbitrary per-case colours as plain numbers so one GSAP
+// tween can move a whole identity at once.
 const fragmentShader = /* glsl */ `
   precision highp float;
 
@@ -109,6 +150,7 @@ export function SoundSculpture({
   const material = useRef<THREE.ShaderMaterial>(null);
   const mesh = useRef<THREE.Mesh>(null);
   const { bands } = useAudioAnalyser();
+  const audible = useExperience(selectAudible);
 
   const uniforms = useMemo(
     () => ({
@@ -119,8 +161,11 @@ export function SoundSculpture({
       uGain: { value: gain },
       uFrequency: { value: NEUTRAL_IDENTITY.frequency },
       uRipple: { value: NEUTRAL_IDENTITY.ripple },
-      uBase: { value: new THREE.Color(IDENTITY_COLOURS.bodyFrom) },
-      uSignal: { value: new THREE.Color(IDENTITY_COLOURS.accentFrom) },
+      uSquare: { value: NEUTRAL_IDENTITY.square },
+      uTaper: { value: NEUTRAL_IDENTITY.taper },
+      uSolid: { value: NEUTRAL_IDENTITY.solid },
+      uBase: { value: new THREE.Vector3() },
+      uSignal: { value: new THREE.Vector3() },
       uMix: { value: 1 },
       uRampStart: { value: signalRampFor(gain).start },
       uRampEnd: { value: signalRampFor(gain).end },
@@ -128,21 +173,17 @@ export function SoundSculpture({
     [gain, reducedMotion],
   );
 
-  // Endpoints for the two colour axes, allocated once. Colour is interpolated
-  // straight into the uniform each frame, so a per-frame `new THREE.Color`
-  // would allocate sixty objects a second for the garbage collector to sweep
-  // during the exact interaction that has to stay smooth.
-  const colourEndpoints = useMemo(
-    () => ({
-      bodyFrom: new THREE.Color(IDENTITY_COLOURS.bodyFrom),
-      bodyTo: new THREE.Color(IDENTITY_COLOURS.bodyTo),
-      accentFrom: new THREE.Color(IDENTITY_COLOURS.accentFrom),
-      accentTo: new THREE.Color(IDENTITY_COLOURS.accentTo),
-    }),
-    [],
-  );
-
   const idleRotation = useRef(0);
+
+  /**
+   * How far the accent has crossfaded to grey, 0 to 1.
+   *
+   * Smoothed per frame rather than tweened, because it is driven by React state
+   * — muting, declining, pausing — and starting a GSAP tween from a render
+   * would be a side effect in the wrong place. At this rate it lands in about a
+   * second, which reads the same as the 1.2s identity morph beside it.
+   */
+  const silence = useRef(audible ? 0 : 1);
 
   useFrame((_, delta) => {
     const u = material.current?.uniforms;
@@ -176,16 +217,24 @@ export function SoundSculpture({
     // for the same reason as sculptureMotion below.
     u.uFrequency.value = activeIdentity.frequency;
     u.uRipple.value = activeIdentity.ripple;
+    u.uSquare.value = activeIdentity.square;
+    u.uTaper.value = activeIdentity.taper;
+    u.uSolid.value = activeIdentity.solid;
 
-    u.uBase.value.lerpColors(
-      colourEndpoints.bodyFrom,
-      colourEndpoints.bodyTo,
-      activeIdentity.warmth,
+    // Toward grey when nothing is audible, toward the case colour when it is.
+    const target = audible ? 0 : 1;
+    silence.current += (target - silence.current) * Math.min(1, delta * 4);
+    const grey = silence.current;
+
+    u.uBase.value.set(
+      activeIdentity.bodyR,
+      activeIdentity.bodyG,
+      activeIdentity.bodyB,
     );
-    u.uSignal.value.lerpColors(
-      colourEndpoints.accentFrom,
-      colourEndpoints.accentTo,
-      activeIdentity.patina,
+    u.uSignal.value.set(
+      activeIdentity.accentR + (SILENT_RGB[0] - activeIdentity.accentR) * grey,
+      activeIdentity.accentG + (SILENT_RGB[1] - activeIdentity.accentG) * grey,
+      activeIdentity.accentB + (SILENT_RGB[2] - activeIdentity.accentB) * grey,
     );
 
     // Scroll drives displacement gain and orbit, §7. Read from a plain object
@@ -220,8 +269,9 @@ export function SoundSculpture({
       // tall case does not simply become a bigger one — the silhouette should
       // change character, not size.
       const stretch = Math.max(0.1, activeIdentity.elongation);
-      const lateral = receded.scale / Math.sqrt(stretch);
-      mesh.current.scale.set(lateral, receded.scale * stretch, lateral);
+      const size = receded.scale * Math.max(0.1, activeIdentity.bulk);
+      const lateral = size / Math.sqrt(stretch);
+      mesh.current.scale.set(lateral, size * stretch, lateral);
     }
   });
 

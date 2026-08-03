@@ -63,6 +63,19 @@ class AudioEngine {
     return this.ctx !== null;
   }
 
+  /**
+   * Whether the analyser is reading anything worth looking at.
+   *
+   * The graph is bed/sfx -> master -> analyser -> destination, so muting zeroes
+   * the master and the analyser reads silence. Anything driving visuals from
+   * the analyser therefore has to ask this rather than `isInitialised`: the
+   * context still exists while muted, it just has nothing in it, and a sculpture
+   * that freezes on mute looks broken rather than quiet.
+   */
+  get isAudible(): boolean {
+    return this.ctx !== null && !this.muted && this.voices.size > 0;
+  }
+
   get sampleRate(): number {
     return this.ctx?.sampleRate ?? 48_000;
   }
