@@ -15,6 +15,8 @@ export const ROUTES = [
   { path: "/services", name: "services" },
   { path: "/process", name: "process" },
   { path: "/studio", name: "studio" },
+  { path: "/journal", name: "journal index" },
+  { path: "/journal/governance-is-the-deliverable", name: "journal post" },
   { path: "/brief", name: "brief" },
 ] as const;
 

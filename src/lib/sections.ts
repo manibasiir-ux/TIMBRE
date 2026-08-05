@@ -20,9 +20,7 @@ export const SECTIONS: readonly Section[] = [
   { id: "services", label: "Services", href: "/services", available: true },
   { id: "studio", label: "Studio", href: "/studio", available: true },
   { id: "process", label: "Process", href: "/process", available: true },
-  // Journal is the one route still unbuilt: it is genuinely prose and wants
-  // MDX, which is a dependency the project has not taken on yet.
-  { id: "journal", label: "Journal", href: "/journal", available: false },
+  { id: "journal", label: "Journal", href: "/journal", available: true },
   { id: "brief", label: "Brief", href: "/brief", available: true },
 ] as const;
 

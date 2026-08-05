@@ -87,17 +87,28 @@ test.describe("mixing desk", () => {
     await expect(desk.getByRole("slider").first()).toBeFocused();
   });
 
-  test("marks unbuilt routes disabled rather than linking them", async ({
-    page,
-  }) => {
+  test("never offers a channel that goes nowhere", async ({ page }) => {
     await visit(page, "/");
     await page.keyboard.press("m");
 
     const desk = page.getByRole("dialog", { name: /mixing desk navigation/i });
-    // Journal has no route yet. A channel that 404s is worse than one that
-    // says so.
-    const journal = desk.getByRole("slider", { name: /journal/i });
-    await expect(journal).toHaveAttribute("aria-disabled", "true");
+
+    // This used to assert that Journal specifically was disabled, which stopped
+    // being true the moment Journal shipped. The rule was never about Journal:
+    // a channel that 404s is worse than one that says so. So it is asserted as
+    // the rule — every enabled channel has a link, every disabled one does not
+    // — which holds however many sections exist.
+    for (const strip of await desk.getByRole("listitem").all()) {
+      const slider = strip.getByRole("slider");
+      const disabled = await slider.getAttribute("aria-disabled");
+      const links = await strip.getByRole("link").count();
+
+      if (disabled === "true") {
+        expect(links, "a disabled channel must not link anywhere").toBe(0);
+      } else {
+        expect(links, "an enabled channel must lead somewhere").toBe(1);
+      }
+    }
   });
 
   test("navigates without reloading the document", async ({ page }) => {
