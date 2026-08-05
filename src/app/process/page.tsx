@@ -12,6 +12,7 @@ import { WaveformRule } from "@/components/primitives/WaveformRule";
  */
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/process" },
   title: "Process",
   description:
     "Five phases from Listen to Guardianship, the delivery manifest, naming convention and format matrix. Written for the people who have to implement it.",

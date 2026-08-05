@@ -3,6 +3,10 @@ import Link from "next/link";
 
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 import {
+  BreadcrumbSchema,
+  ServiceSchema,
+} from "@/components/seo/StructuredData";
+import {
   FAQ,
   LICENSING,
   PACKAGES,
@@ -22,6 +26,7 @@ import {
  */
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/services" },
   title: "Services",
   description:
     "Three packages with published price bands, six service lines, and a guardianship retainer. Mnemonic from £45k, Identity from £110k, System from £220k.",
@@ -30,6 +35,9 @@ export const metadata: Metadata = {
 export default function ServicesPage() {
   return (
     <>
+      <ServiceSchema />
+      <BreadcrumbSchema trail={[{ name: "Services", path: "/services" }]} />
+
       <section className="shell pt-[14vh] pb-12">
         <h1 className="font-display text-h1 text-ink">Services</h1>
         <p className="mt-8 max-w-[48ch] text-lead text-ink-70">

@@ -1,6 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RATE_LIMIT, clientIp, createMemoryRateLimiter } from "./delivery";
+import {
+  RATE_LIMIT,
+  clientIp,
+  createMemoryRateLimiter,
+  createUpstashRateLimiter,
+  emailTransport,
+} from "./delivery";
+import type { BriefPayload } from "./schema";
+
+/** A minimal valid submission, so each test states only what it varies. */
+function payload(): BriefPayload {
+  return {
+    name: "Kiri Tanaka",
+    company: "Solene Group",
+    role: "",
+    email: "kiri@example.com",
+    services: ["Soundscape architecture"],
+    moment: "Arrival, across thirty-one properties.",
+    budget: "220+",
+    targetDate: "",
+    attachmentName: "",
+    fax: "",
+    turnstileToken: "",
+  };
+}
 
 describe("rate limiter, NFR-12", () => {
   it("allows exactly five in a window and refuses the sixth", () => {
@@ -70,5 +94,112 @@ describe("clientIp", () => {
   it("never returns empty, so the limiter always has a key", () => {
     expect(clientIp(new Headers())).toBe("unknown");
     expect(clientIp(new Headers({ "x-real-ip": "   " }))).toBe("unknown");
+  });
+});
+
+describe("email delivery", () => {
+  const original = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...original };
+    vi.restoreAllMocks();
+  });
+
+  it("stubs quietly when no key is configured", async () => {
+    delete process.env.RESEND_API_KEY;
+    vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await emailTransport.send("TMB-260101-AAA", payload());
+    expect(result.ok).toBe(true);
+    expect(result.detail).toBe("stubbed");
+  });
+
+  it("refuses a key configured without addresses", async () => {
+    // The dangerous half-configured state. This used to return ok:true with
+    // the detail "resend adapter not yet installed", so setting the key would
+    // have made every brief report success and deliver nothing — a failure
+    // only visible as enquiries that never arrived.
+    process.env.RESEND_API_KEY = "re_test";
+    delete process.env.BRIEF_TO_EMAIL;
+    delete process.env.BRIEF_FROM_EMAIL;
+
+    const result = await emailTransport.send("TMB-260101-AAA", payload());
+    expect(result.ok).toBe(false);
+    expect(result.detail).toMatch(/BRIEF_TO_EMAIL/);
+  });
+
+  it("reports a non-2xx from Resend as a failure", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.BRIEF_TO_EMAIL = "studio@example.com";
+    process.env.BRIEF_FROM_EMAIL = "site@example.com";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 422 })),
+    );
+
+    const result = await emailTransport.send("TMB-260101-AAA", payload());
+    expect(result.ok).toBe(false);
+    expect(result.detail).toContain("422");
+  });
+
+  it("sends the reference and replies to the enquirer", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.BRIEF_TO_EMAIL = "studio@example.com";
+    process.env.BRIEF_FROM_EMAIL = "site@example.com";
+
+    const sent: RequestInit[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        sent.push(init);
+        return new Response("{}", { status: 200 });
+      }),
+    );
+
+    const result = await emailTransport.send("TMB-260101-AAA", payload());
+    expect(result.ok).toBe(true);
+
+    const body = JSON.parse(String(sent[0]?.body));
+    expect(body.subject).toContain("TMB-260101-AAA");
+    // Replying to the studio's own address rather than the enquirer is the
+    // small mistake that makes an inbox useless.
+    expect(body.reply_to).toBe("kiri@example.com");
+  });
+});
+
+describe("the Upstash limiter", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("counts in Redis and blocks past the limit", async () => {
+    let count = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        count += 1;
+        return new Response(JSON.stringify([{ result: count }, { result: 1 }]), {
+          status: 200,
+        });
+      }),
+    );
+
+    const limiter = createUpstashRateLimiter("https://redis.test", "token");
+    for (let i = 0; i < RATE_LIMIT.max; i += 1) {
+      expect((await limiter.check("ip")).allowed).toBe(true);
+    }
+    expect((await limiter.check("ip")).allowed).toBe(false);
+  });
+
+  it("fails open when Upstash is unreachable", async () => {
+    // Deliberate. This protects an inbox from spam, not a system from harm, and
+    // a Redis outage is a poor reason to refuse a real client's brief.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network");
+      }),
+    );
+
+    const limiter = createUpstashRateLimiter("https://redis.test", "token");
+    expect((await limiter.check("ip")).allowed).toBe(true);
   });
 });

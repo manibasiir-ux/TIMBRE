@@ -18,6 +18,7 @@ export const ROUTES = [
   { path: "/journal", name: "journal index" },
   { path: "/journal/governance-is-the-deliverable", name: "journal post" },
   { path: "/brief", name: "brief" },
+  { path: "/privacy", name: "privacy" },
 ] as const;
 
 /** Answers the gate. Declining keeps the suite silent and deterministic. */

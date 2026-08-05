@@ -5,6 +5,10 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 
 import { Listen } from "@/components/journal/Listen";
 import { WaveformRule } from "@/components/primitives/WaveformRule";
+import {
+  ArticleSchema,
+  BreadcrumbSchema,
+} from "@/components/seo/StructuredData";
 import { allPosts, formatJournalDate, postBySlug } from "@/lib/journal";
 
 /**
@@ -39,6 +43,7 @@ export async function generateMetadata({
   return {
     title: `${post.title} — TIMBRE`,
     description: post.summary,
+    alternates: { canonical: `/journal/${post.slug}` },
     openGraph: {
       title: post.title,
       description: post.summary,
@@ -103,6 +108,19 @@ export default async function JournalPost({
 
   return (
     <>
+      <ArticleSchema
+        title={post.title}
+        description={post.summary}
+        datePublished={post.date}
+        path={`/journal/${post.slug}`}
+      />
+      <BreadcrumbSchema
+        trail={[
+          { name: "Journal", path: "/journal" },
+          { name: post.title, path: `/journal/${post.slug}` },
+        ]}
+      />
+
       <section className="shell pt-[14vh] pb-10">
         <p className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-mono-xs text-ink-70">
           <time dateTime={post.date}>{formatJournalDate(post.date)}</time>

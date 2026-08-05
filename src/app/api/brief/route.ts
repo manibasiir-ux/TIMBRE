@@ -1,6 +1,6 @@
 import {
   clientIp,
-  createMemoryRateLimiter,
+  createRateLimiter,
   emailTransport,
   slackTransport,
   turnstileVerifier,
@@ -20,7 +20,9 @@ import { briefSchema } from "@/lib/brief/schema";
  * whoever wrote it; letting it believe it succeeded is not.
  */
 
-const limiter = createMemoryRateLimiter();
+// Upstash when configured, in-memory otherwise. On serverless the in-memory
+// limiter is effectively no limiter at all — every cold start gets an empty map.
+const limiter = createRateLimiter();
 
 export async function POST(request: Request) {
   const ip = clientIp(request.headers);

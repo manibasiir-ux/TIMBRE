@@ -2,16 +2,22 @@ import type { Metadata, Viewport } from "next";
 
 import { SmoothScroll } from "@/app/providers/SmoothScroll";
 import { ConsentGate } from "@/components/consent/ConsentGate";
+import { OrganizationSchema } from "@/components/seo/StructuredData";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { SceneMount } from "@/components/webgl/SceneMount";
 import { SculptureRouteState } from "@/components/webgl/SculptureRouteState";
 import { fontVariables } from "@/lib/fonts";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  // NFR-11. Every route inherits this and overrides it with its own path;
+  // without it the same page is reachable at a preview host, a vercel.app host
+  // and a custom domain, and a crawler treats all three as competing copies.
+  alternates: { canonical: "/" },
   title: {
     default: "TIMBRE — Sonic Identity Studio",
     template: "%s · TIMBRE",
@@ -55,6 +61,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={fontVariables}>
       <body>
+        <OrganizationSchema />
+
         {/* Specification §10: first focusable element on the page. */}
         <a
           href="#main"

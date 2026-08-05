@@ -19,6 +19,7 @@ import { allPosts, formatJournalDate } from "@/lib/journal";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/journal" },
   title: "Journal — TIMBRE",
   description:
     "Writing on sonic identity: what the work involves, what it costs, and what makes it survive handover.",

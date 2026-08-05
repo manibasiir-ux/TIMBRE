@@ -12,6 +12,7 @@ import { WaveformRule } from "@/components/primitives/WaveformRule";
  */
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/studio" },
   title: "Studio",
   description:
     "A sonic identity studio in Hackney. Composers, sound designers and strategists who deliver systems rather than folders of files.",

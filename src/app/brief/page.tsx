@@ -12,6 +12,7 @@ import { WaveformRule } from "@/components/primitives/WaveformRule";
  */
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/brief" },
   title: "Brief us",
   description:
     "Tell us what you are making audible. Two working days to a reply, and a technical scoping call if that is what you need.",

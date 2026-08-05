@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { stemForCase } from "@/lib/audio/manifest";
@@ -48,6 +48,8 @@ export function CaseAudio({
   const [active, setActive] = useState<string | null>(null);
   const asset = stemForCase(slug);
   const missing = asset ? unavailable.includes(asset.id) : true;
+  const inventoryRef = useRef<HTMLElement>(null);
+  const deepLinked = useRef(false);
 
   // Tells the sculpture and its accessible name which case is on screen, and
   // hands both back on the way out so the next route does not inherit them.
@@ -63,6 +65,47 @@ export function CaseAudio({
     },
     [asset],
   );
+
+  /**
+   * `?t=<seconds>`, FR-13.
+   *
+   * Scrolls to the inventory and starts the stem at that offset. The roadmap
+   * records this deep link breaking on Safari 17 at launch, from a
+   * URLSearchParams parse running before hydration — so the read happens in an
+   * effect, after mount, where `window.location` is unambiguous.
+   *
+   * It runs at most once. Without the guard a re-render from consent or mute
+   * would restart the audio and yank the page back, which is the behaviour a
+   * shared timestamp link should have exactly one of.
+   */
+  useEffect(() => {
+    if (deepLinked.current || consent !== "granted" || !asset) return;
+
+    const raw = new URLSearchParams(window.location.search).get("t");
+    if (raw === null) return;
+
+    const seconds = Number.parseFloat(raw);
+    if (!Number.isFinite(seconds) || seconds < 0) return;
+
+    deepLinked.current = true;
+
+    void (async () => {
+      const buffer = await audioEngine.load(asset.id, asset.url);
+      if (!buffer) {
+        markUnavailable(asset.id);
+        return;
+      }
+
+      inventoryRef.current?.scrollIntoView({ block: "start" });
+      audioEngine.duck();
+      audioEngine.play(asset.id, {
+        bus: "sfx",
+        fadeSeconds: 0.2,
+        offsetSeconds: seconds,
+      });
+      setActive(inventory[0]?.name ?? null);
+    })();
+  }, [asset, consent, inventory, markUnavailable]);
 
   const audition = async (id: string) => {
     if (!asset || consent !== "granted") return;
@@ -94,7 +137,7 @@ export function CaseAudio({
 
   return (
     <>
-      <section className="shell section-rhythm">
+      <section ref={inventoryRef} className="shell section-rhythm">
         <h2 className="font-display text-h2 text-ink">The system</h2>
         <p className="mt-4 max-w-[64ch] text-body text-ink-70">
           Every asset delivered, named as it ships. Loudness and format are the

@@ -207,7 +207,13 @@ class AudioEngine {
 
   play(
     id: string,
-    { loop = false, bus = "bed" as AudioBus, fadeSeconds = 0, gain = 1 } = {},
+    {
+      loop = false,
+      bus = "bed" as AudioBus,
+      fadeSeconds = 0,
+      gain = 1,
+      offsetSeconds = 0,
+    } = {},
   ): boolean {
     const ctx = this.ensure();
     const buffer = this.buffers.get(id);
@@ -234,7 +240,16 @@ class AudioEngine {
 
     source.connect(voiceGain);
     voiceGain.connect(this.buses[bus]);
-    source.start();
+
+    // FR-13's `?t=` lands here. Clamped and wrapped rather than trusted: the
+    // value comes from a URL anyone can edit, and `start()` throws on a
+    // negative offset and plays silence forever on one past the end.
+    const duration = buffer.duration;
+    const offset =
+      Number.isFinite(offsetSeconds) && offsetSeconds > 0
+        ? offsetSeconds % duration
+        : 0;
+    source.start(0, offset);
 
     // A non-looping voice must unregister itself, or isPlaying lies forever.
     source.onended = () => {

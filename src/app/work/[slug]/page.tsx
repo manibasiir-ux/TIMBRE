@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { WaveformRule } from "@/components/primitives/WaveformRule";
+import { BreadcrumbSchema } from "@/components/seo/StructuredData";
 import { CaseAudio } from "@/components/work/CaseAudio";
 import { CASES, caseBySlug, nextCase } from "@/content/cases";
 
@@ -30,6 +31,7 @@ export async function generateMetadata({
   return {
     title: `${entry.client} — ${entry.tier}`,
     description: entry.summary,
+    alternates: { canonical: `/work/${entry.slug}` },
     openGraph: {
       title: `${entry.client} · TIMBRE`,
       description: entry.summary,
@@ -51,6 +53,13 @@ export default async function CaseStudyPage({
 
   return (
     <>
+      <BreadcrumbSchema
+        trail={[
+          { name: "Work", path: "/work" },
+          { name: entry.client, path: `/work/${entry.slug}` },
+        ]}
+      />
+
       <section className="shell pt-[14vh] pb-12">
         <p className="font-mono text-mono-xs text-ink-70">Case study</p>
         <h1 className="mt-6 font-display text-mega text-ink">{entry.client}</h1>

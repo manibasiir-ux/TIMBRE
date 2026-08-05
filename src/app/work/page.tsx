@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { WorkIndex } from "@/components/work/WorkIndex";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/work" },
   title: "Work",
   description:
     "Sonic identity work across fintech, mobility, hospitality and aviation. Each case study plays its own system in the context it was built for.",
