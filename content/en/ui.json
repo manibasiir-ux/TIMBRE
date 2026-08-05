@@ -1,0 +1,99 @@
+{
+  "_comment": "UI copy, NFR-15. Case studies, services and journal posts live in their own content files and are already externalised; this is the chrome that wraps them. A second language means a sibling directory, not a code change.",
+
+  "consent": {
+    "play": "▶ Play the room",
+    "silent": "Stay silent",
+    "note": "Everything works without sound. You can change this at any time from the transport bar."
+  },
+
+  "_labels": "Everything under `labels` is rendered into fixed space — a transport row, a channel strip, a button — and is held to a character budget that assumes German runs 35% longer. `a11y` is accessible names, which are announced and never laid out, so they are free to be as clear as they need to be.",
+
+  "labels": {
+    "transport": {
+      "on": "ON",
+      "off": "MUTE",
+      "desk": "≡ Desk",
+      "bed": "SHOWREEL BED"
+    },
+    "desk": {
+      "go": "Go",
+      "soon": "Soon"
+    },
+    "nav": {
+      "skip": "Skip to content",
+      "home": "Home",
+      "work": "Work",
+      "services": "Services",
+      "studio": "Studio",
+      "process": "Process",
+      "journal": "Journal",
+      "brief": "Brief"
+    }
+  },
+
+  "a11y": {
+    "play": "Play the reel",
+    "pause": "Pause the reel",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "deskLabel": "Mixing desk navigation",
+    "scrollProgress": "Scroll progress"
+  },
+
+  "home": {
+    "heroLines": ["We make", "Brands", "Audible"],
+    "heroLabel": "We make brands audible",
+    "heroMeta": ["Sonic identity studio", "London", "Est. 2019"],
+    "scroll": "Scroll",
+    "manifesto": [
+      "Sound is the only brand asset that reaches a customer with their eyes closed.",
+      "A sonic identity is a system, not a jingle.",
+      "We build the system, and the guidelines that keep it coherent after we leave."
+    ],
+    "workRail": {
+      "title": "Selected work",
+      "projects": "projects",
+      "open": "Open case →",
+      "sounding": "◉ SOUNDING"
+    },
+    "services": {
+      "title": "What we make",
+      "all": "All six service lines, packages and price bands →"
+    },
+    "clients": {
+      "title": "Selected clients",
+      "engagements": "engagements",
+      "published": "published"
+    },
+    "journal": {
+      "title": "From the journal",
+      "all": "All entries →"
+    },
+    "brief": {
+      "lines": ["Let’s make", "something", "audible"],
+      "label": "Let’s make something audible",
+      "cta": "Brief us →",
+      "reassurance": "Four short steps, about three minutes. You get a reference code and a reply within two working days."
+    }
+  },
+
+  "journal": {
+    "title": "Journal",
+    "lead": "What we have learned building sonic identities, written down while it is still specific enough to be useful.",
+    "entry": "entry",
+    "entries": "entries",
+    "empty": "Nothing published yet.",
+    "audioEssay": "◉ AUDIO ESSAY",
+    "minutes": "min",
+    "read": "min read",
+    "back": "← All entries",
+    "listen": "◉ LISTEN",
+    "describeRecording": "Read a description of this recording"
+  },
+
+  "notFound": {
+    "title": "Dead channel",
+    "body": "Nothing is routed here. The desk is still open."
+  }
+}

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { focusAfterCommit } from "@/lib/focusAfterCommit";
+import { getDictionary } from "@/lib/i18n";
 import { useExperience } from "@/store/useExperience";
 
 /**
@@ -20,6 +21,7 @@ import { useExperience } from "@/store/useExperience";
  * motion system.
  */
 export function ConsentGate() {
+  const ui = getDictionary();
   const consent = useExperience((state) => state.consent);
   const hydrateConsent = useExperience((state) => state.hydrateConsent);
   const grantConsent = useExperience((state) => state.grantConsent);
@@ -104,7 +106,7 @@ export function ConsentGate() {
           onClick={() => decide(() => void grantConsent())}
           className="min-h-11 bg-signal px-8 py-4 font-mono text-mono text-ground transition-opacity duration-[var(--dur-quick)] hover:opacity-90"
         >
-          ▶ Play the room
+          {ui.consent.play}
         </button>
 
         <button
@@ -112,7 +114,7 @@ export function ConsentGate() {
           onClick={() => decide(declineConsent)}
           className="min-h-11 border border-ink-15 px-8 py-4 font-mono text-mono text-ink transition-colors duration-[var(--dur-quick)] hover:border-ink-40"
         >
-          Stay silent
+          {ui.consent.silent}
         </button>
       </div>
 
@@ -120,8 +122,7 @@ export function ConsentGate() {
         id="consent-note"
         className="max-w-[42ch] text-center text-small text-ink-70"
       >
-        Everything works without sound. You can change this at any time from the
-        transport bar.
+        {ui.consent.note}
       </p>
     </div>
   );

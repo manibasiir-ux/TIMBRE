@@ -8,6 +8,12 @@ import { TransportBar } from "@/components/transport/TransportBar";
 import { SceneMount } from "@/components/webgl/SceneMount";
 import { SculptureRouteState } from "@/components/webgl/SculptureRouteState";
 import { fontVariables } from "@/lib/fonts";
+import {
+  DEFAULT_LOCALE,
+  LOCALE_TAGS,
+  getDictionary,
+  languageAlternates,
+} from "@/lib/i18n";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -18,7 +24,15 @@ export const metadata: Metadata = {
   // NFR-11. Every route inherits this and overrides it with its own path;
   // without it the same page is reachable at a preview host, a vercel.app host
   // and a custom domain, and a crawler treats all three as competing copies.
-  alternates: { canonical: "/" },
+  //
+  // NFR-15's hreflang comes from the same field. With one locale it is a single
+  // self-referential entry, which states the page's language rather than
+  // leaving a crawler to infer it, and becomes the real map the moment a second
+  // language exists.
+  alternates: {
+    canonical: "/",
+    languages: languageAlternates("/"),
+  },
   title: {
     default: "TIMBRE — Sonic Identity Studio",
     template: "%s · TIMBRE",
@@ -59,8 +73,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const ui = getDictionary(DEFAULT_LOCALE);
+
   return (
-    <html lang="en" className={fontVariables}>
+    // `en-GB`, not `en`. The copy is British and a screen reader pronouncing
+    // "£220k" in American English is a small wrongness that costs nothing to
+    // avoid. NFR-15.
+    <html lang={LOCALE_TAGS[DEFAULT_LOCALE]} className={fontVariables}>
       <body>
         <OrganizationSchema />
         <RouteWipe />
@@ -70,7 +89,7 @@ export default function RootLayout({
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[10000] focus:bg-signal focus:px-4 focus:py-3 focus:text-mono focus:text-ground"
         >
-          Skip to content
+          {ui.labels.nav.skip}
         </a>
 
         {/* FR-05: mounted once here, never unmounted, so route changes never

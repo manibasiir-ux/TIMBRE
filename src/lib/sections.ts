@@ -1,3 +1,5 @@
+import { getDictionary } from "@/lib/i18n";
+
 /**
  * The seven channels of the mixing desk, specification §8.
  *
@@ -14,14 +16,21 @@ export type Section = {
   available: boolean;
 };
 
+/**
+ * Labels come from the dictionary rather than being written here, NFR-15. The
+ * id is the key, so a translated build needs no change to this file and a
+ * missing key is a type error rather than a blank channel strip.
+ */
+const nav = getDictionary().labels.nav;
+
 export const SECTIONS: readonly Section[] = [
-  { id: "home", label: "Home", href: "/", available: true },
-  { id: "work", label: "Work", href: "/work", available: true },
-  { id: "services", label: "Services", href: "/services", available: true },
-  { id: "studio", label: "Studio", href: "/studio", available: true },
-  { id: "process", label: "Process", href: "/process", available: true },
-  { id: "journal", label: "Journal", href: "/journal", available: true },
-  { id: "brief", label: "Brief", href: "/brief", available: true },
+  { id: "home", label: nav.home, href: "/", available: true },
+  { id: "work", label: nav.work, href: "/work", available: true },
+  { id: "services", label: nav.services, href: "/services", available: true },
+  { id: "studio", label: nav.studio, href: "/studio", available: true },
+  { id: "process", label: nav.process, href: "/process", available: true },
+  { id: "journal", label: nav.journal, href: "/journal", available: true },
+  { id: "brief", label: nav.brief, href: "/brief", available: true },
 ] as const;
 
 /** Two-digit channel number, `01`…`07`. */
