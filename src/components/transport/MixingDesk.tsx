@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { track } from "@/lib/analytics";
 import { focusAfterCommit } from "@/lib/focusAfterCommit";
 import { SECTIONS, channelNumber, faderValueText } from "@/lib/sections";
 import { scrollToProgress } from "@/lib/useScrollProgress";
@@ -57,7 +58,14 @@ export function MixingDesk({
         panel.current?.querySelectorAll<HTMLElement>('[role="slider"]') ?? [],
       );
 
-    strips()[0]?.focus();
+    // Deferred to after the commit, like every other focus move in this file.
+    // Calling focus() synchronously here worked in Chromium and raced the DOM
+    // in WebKit, where the panel is not always focusable by the time the effect
+    // runs — so opening the desk sometimes left focus nowhere and the first
+    // arrow key went to the page instead of the channel strips. It presented as
+    // a flaky test for a long time before being read as what it was: the same
+    // focus-versus-commit race focusAfterCommit was extracted to fix.
+    focusAfterCommit(() => strips()[0]);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -107,6 +115,9 @@ export function MixingDesk({
 
   const commit = (value: number) => {
     scrollToProgress(snapToDetent(value));
+    // FR-09 on release. NFR-14 measures this because a fader nobody drags is a
+    // navigation metaphor that has not landed.
+    track("fader_dragged");
   };
 
   const onFaderKeyDown = (

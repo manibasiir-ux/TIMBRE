@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { SmoothScroll } from "@/app/providers/SmoothScroll";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { OrganizationSchema } from "@/components/seo/StructuredData";
+import { RouteWipe } from "@/components/transport/RouteWipe";
 import { TransportBar } from "@/components/transport/TransportBar";
 import { SceneMount } from "@/components/webgl/SceneMount";
 import { SculptureRouteState } from "@/components/webgl/SculptureRouteState";
@@ -62,6 +63,7 @@ export default function RootLayout({
     <html lang="en" className={fontVariables}>
       <body>
         <OrganizationSchema />
+        <RouteWipe />
 
         {/* Specification §10: first focusable element on the page. */}
         <a

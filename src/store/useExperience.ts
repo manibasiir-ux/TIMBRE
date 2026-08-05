@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 
+import { track } from "@/lib/analytics";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import {
   type AudioConsent,
@@ -77,6 +78,7 @@ export const useExperience = create<ExperienceState>((set, get) => ({
   grantConsent: async () => {
     writeConsent("granted");
     set({ consent: "granted" });
+    track("audio_consent_granted");
     // resume() must be called synchronously enough to stay inside the gesture
     // that triggered it, or the autoplay policy refuses the context.
     const running = await audioEngine.resume();
@@ -86,6 +88,9 @@ export const useExperience = create<ExperienceState>((set, get) => ({
   declineConsent: () => {
     writeConsent("declined");
     set({ consent: "declined", isPlaying: false });
+    // NFR-14 measures both answers. A consent gate is only worth keeping if
+    // the rate of people declining it is visible.
+    track("audio_consent_declined");
   },
 
   setPlaying: (isPlaying) => set({ isPlaying }),
@@ -106,15 +111,31 @@ export const useExperience = create<ExperienceState>((set, get) => ({
     set({ activeCase });
   },
 
-  setProfile: (profile) => set({ profile }),
+  setProfile: (profile) => {
+    if (get().profile !== profile) track("webgl_profile_selected", { profile });
+    set({ profile });
+  },
 
-  degradeProfile: () => set({ profile: stepProfileDown(get().profile) }),
+  degradeProfile: () => {
+    const profile = stepProfileDown(get().profile);
+    // FR-11's step-down. Knowing how often real machines fall back is the only
+    // way to tell whether the high profile is tuned for the wrong hardware.
+    track("perf_stepdown", { from: get().profile, to: profile });
+    set({ profile });
+  },
 
   setScrollProgress: (scrollProgress) => set({ scrollProgress }),
 
-  setDeskOpen: (deskOpen) => set({ deskOpen }),
+  setDeskOpen: (deskOpen) => {
+    if (deskOpen && !get().deskOpen) track("desk_opened");
+    set({ deskOpen });
+  },
 
-  toggleDesk: () => set({ deskOpen: !get().deskOpen }),
+  toggleDesk: () => {
+    const deskOpen = !get().deskOpen;
+    if (deskOpen) track("desk_opened");
+    set({ deskOpen });
+  },
 
   markStemUnavailable: (id) => {
     const current = get().unavailableStems;

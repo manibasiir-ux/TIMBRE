@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { track } from "@/lib/analytics";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { CONFIRM_MNEMONIC } from "@/lib/audio/manifest";
 import {
@@ -155,6 +156,9 @@ export function BriefForm() {
       }
     }
     setErrors({});
+    // NFR-14, and the most valuable number the form produces: which step people
+    // abandon. A single completion rate cannot tell you where it went wrong.
+    track("brief_step_completed", { step: step + 1 });
     setStep((current) => Math.min(current + 1, STEPS.length - 1));
   };
 
@@ -225,6 +229,9 @@ export function BriefForm() {
 
       setReference(body.reference);
       clearDraft();
+      // The budget band, not the enquirer. Which bands convert is a question
+      // about the price ladder; who sent it is not analytics' business.
+      track("brief_submitted", { budget: values.budget ?? "unknown" });
 
       // §6.8: the transport plays the confirmation mnemonic on success.
       if (consent === "granted") {

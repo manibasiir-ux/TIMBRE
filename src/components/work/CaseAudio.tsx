@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { track } from "@/lib/analytics";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { stemForCase } from "@/lib/audio/manifest";
 import type { ContextPlayer, InventoryItem } from "@/content/cases";
@@ -128,6 +129,9 @@ export function CaseAudio({
     audioEngine.duck();
     audioEngine.play(asset.id, { bus: "sfx", fadeSeconds: 0.2 });
     setActive(id);
+    // NFR-14. Whether anyone actually plays the work is the single most
+    // useful thing this site can measure about itself.
+    track("case_study_audio_play", { slug, asset: id });
   };
 
   const disabled = consent !== "granted" || missing;

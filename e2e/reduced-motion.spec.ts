@@ -96,8 +96,12 @@ test.describe("reduced motion", () => {
 
     // The sculpture holds a fixed pose here, so nothing about a case is
     // carried by the form changing. Content parity means the card says it.
+    //
+    // Scoped to the cards: the client wall repeats these names further down, so
+    // an unscoped match finds two and fails on strict mode.
+    const cards = page.locator("[data-case-card]");
     for (const client of ["Kestrel", "Halcyon Mobility", "Solene Group"]) {
-      await expect(page.getByText(client, { exact: true })).toBeAttached();
+      await expect(cards.getByText(client, { exact: true })).toBeAttached();
     }
   });
 

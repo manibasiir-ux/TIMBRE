@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { track } from "@/lib/analytics";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import { BED } from "@/lib/audio/manifest";
 import { scrollToProgress, useScrollProgress } from "@/lib/useScrollProgress";
@@ -42,6 +43,8 @@ export function TransportBar() {
   const audible = useExperience(selectAudible);
 
   const deskToggle = useRef<HTMLButtonElement>(null);
+  const audibleSeconds = useRef(0);
+  const reelMilestone = useRef(false);
   const [elapsed, setElapsed] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bedFailed, setBedFailed] = useState(false);
@@ -80,6 +83,32 @@ export function TransportBar() {
     }, 250);
     return () => window.clearInterval(id);
   }, [isPlaying, duration]);
+
+  /**
+   * `reel_played_30s`, NFR-14.
+   *
+   * Thirty seconds of *audible* audio, not thirty seconds on the page. Someone
+   * who granted consent and then muted has not listened to the reel, and
+   * counting them would flatter the one number that says whether the sound is
+   * worth having built.
+   *
+   * Fires once per page load. `audible` going false pauses the count rather
+   * than restarting it, so muting halfway through and coming back still adds up.
+   */
+  useEffect(() => {
+    if (!audible || reelMilestone.current) return;
+
+    const id = window.setInterval(() => {
+      audibleSeconds.current += 1;
+      if (audibleSeconds.current >= 30) {
+        reelMilestone.current = true;
+        track("reel_played_30s");
+        window.clearInterval(id);
+      }
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, [audible]);
 
   const togglePlayback = useCallback(() => {
     if (consent !== "granted") return;

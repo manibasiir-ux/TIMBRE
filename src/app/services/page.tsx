@@ -6,6 +6,7 @@ import {
   BreadcrumbSchema,
   ServiceSchema,
 } from "@/components/seo/StructuredData";
+import { ViewedPricing } from "@/components/seo/ViewedPricing";
 import {
   FAQ,
   LICENSING,
@@ -100,6 +101,7 @@ export default function ServicesPage() {
       </section>
 
       <section className="shell section-rhythm">
+        <ViewedPricing />
         <h2 className="font-display text-h2 text-ink">Packages</h2>
         <ul className="mt-12 grid grid-cols-4 gap-4 lg:grid-cols-12">
           {PACKAGES.map((pack) => {

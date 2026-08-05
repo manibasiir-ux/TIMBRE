@@ -47,13 +47,16 @@ test.describe("work rail", () => {
     const cards = page.locator("[data-case-card]");
     await expect(cards).toHaveCount(4);
 
+    // Scoped to the rail. These names also appear in the client wall further
+    // down the page, so an unscoped text match resolves to two elements and
+    // fails on strict mode — which is what it did the moment the wall shipped.
     for (const client of [
       "Kestrel",
       "Halcyon Mobility",
       "Solene Group",
       "European flag carrier",
     ]) {
-      await expect(page.getByText(client, { exact: true })).toBeAttached();
+      await expect(cards.getByText(client, { exact: true })).toBeAttached();
     }
   });
 
