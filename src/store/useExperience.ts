@@ -6,6 +6,7 @@ import { track } from "@/lib/analytics";
 import { audioEngine } from "@/lib/audio/AudioEngine";
 import {
   type AudioConsent,
+  purgeLegacyConsent,
   readConsent,
   writeConsent,
 } from "@/lib/audio/consent";
@@ -71,6 +72,11 @@ export const useExperience = create<ExperienceState>((set, get) => ({
   unavailableStems: [],
 
   hydrateConsent: () => {
+    // One-time cleanup of the 180-day localStorage record the previous
+    // implementation wrote. It no longer suppresses anything, but anyone who
+    // visited the old site is carrying one until 2027.
+    purgeLegacyConsent();
+
     const stored = readConsent();
     if (stored !== "pending") set({ consent: stored });
   },

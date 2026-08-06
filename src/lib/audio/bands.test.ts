@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   BAND_RANGES,
+  METER_BAND_COUNT,
+  METER_BAND_EDGES_HZ,
   averageBand,
   computeBands,
   createBands,
@@ -164,5 +166,78 @@ describe("decibel conversion", () => {
 
   it("does not return -Infinity for silence", () => {
     expect(Number.isFinite(gainToDb(0))).toBe(true);
+  });
+});
+
+describe("METER_BAND_EDGES_HZ", () => {
+  /**
+   * The sound toggle's five bars. These edges were chosen against measurements
+   * of the real bed rather than picked for tidiness, so the properties worth
+   * asserting are the ones that would silently produce a dead bar.
+   */
+
+  it("describes five bands", () => {
+    expect(METER_BAND_COUNT).toBe(5);
+    expect(METER_BAND_EDGES_HZ).toHaveLength(6);
+  });
+
+  it("ascends without gaps or overlaps", () => {
+    for (let i = 1; i < METER_BAND_EDGES_HZ.length; i += 1) {
+      expect(METER_BAND_EDGES_HZ[i]).toBeGreaterThan(METER_BAND_EDGES_HZ[i - 1]);
+    }
+  });
+
+  it("gives every band at least one FFT bin at common sample rates", () => {
+    /**
+     * The failure this exists for: a band narrower than the analyser's
+     * resolution resolves to zero bins, and `averageBand` widens it to one
+     * rather than dividing by zero — so the bar silently reads a neighbouring
+     * band instead of its own. At 48 kHz a bin is 23.4 Hz wide, and the lowest
+     * band here is 54 Hz wide, which is the tight one.
+     */
+    for (const rate of [44_100, 48_000]) {
+      const hzPerBin = rate / 2 / BIN_COUNT;
+      for (let i = 0; i < METER_BAND_COUNT; i += 1) {
+        const from = METER_BAND_EDGES_HZ[i];
+        const to = METER_BAND_EDGES_HZ[i + 1];
+        const bins = Math.ceil(to / hzPerBin) - Math.floor(from / hzPerBin);
+        expect(
+          bins,
+          `band ${from}-${to}Hz resolves to ${bins} bins at ${rate}Hz`,
+        ).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+
+  it("reads each band independently", () => {
+    // Energy placed in one band must not light the others, or the meter draws
+    // five copies of the same number and the spectrum shape is a fiction.
+    for (let i = 0; i < METER_BAND_COUNT; i += 1) {
+      const from = METER_BAND_EDGES_HZ[i];
+      const to = METER_BAND_EDGES_HZ[i + 1];
+      const data = spectrumWithEnergyAt(from, to);
+
+      const own = averageBand(data, SAMPLE_RATE, FFT_SIZE, from, to);
+      expect(own, `band ${from}-${to}Hz is deaf to its own energy`).toBeGreaterThan(0);
+
+      for (let j = 0; j < METER_BAND_COUNT; j += 1) {
+        if (j === i) continue;
+        const other = averageBand(
+          data,
+          SAMPLE_RATE,
+          FFT_SIZE,
+          METER_BAND_EDGES_HZ[j],
+          METER_BAND_EDGES_HZ[j + 1],
+        );
+        expect(other).toBeLessThan(own);
+      }
+    }
+  });
+
+  it("stays inside the range the bed actually occupies", () => {
+    // Reaching to 8 kHz left the top bar at a median of 0.003 across a whole
+    // loop, which is a bar that never moves.
+    expect(METER_BAND_EDGES_HZ[0]).toBeGreaterThanOrEqual(20);
+    expect(METER_BAND_EDGES_HZ[METER_BAND_COUNT]).toBeLessThanOrEqual(4000);
   });
 });

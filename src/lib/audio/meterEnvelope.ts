@@ -84,6 +84,17 @@ export class PeakHold {
   }
 }
 
+/**
+ * A note on `AudioEngine.getLevel()`, kept because it has now misled twice.
+ *
+ * It is an RMS across all 1024 FFT bins. Tonal material is a handful of narrow
+ * peaks in a mostly empty spectrum, so the mean can never approach 1: a
+ * full-scale reference oscillator reads **0.064**, and the bed sits around
+ * **0.15** with only 5% of travel across a whole loop. It is a poor driver for
+ * anything visual. Drive meters from `averageBand` in bands.ts instead, which
+ * is what the sound toggle does.
+ */
+
 /** Splits a mono level into a stereo pair with a small fixed offset. */
 export function stereoSpread(level: number): [number, number] {
   // The generated audio is mono, so a true stereo reading is not available.

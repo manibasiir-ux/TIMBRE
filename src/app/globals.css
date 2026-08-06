@@ -98,7 +98,6 @@
   /* Layout ------------------------------------------------------------- */
   --container-shell: 1680px;
   --gutter: clamp(1.25rem, 4vw, 5rem);
-  --transport-height: 64px;
   --measure-body: 64ch;
   --measure-lead: 48ch;
 }
@@ -134,9 +133,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100dvh;
-    /* Specification §5: the transport bar occupies a fixed band at the bottom
-       of every viewport, so no page may lay content underneath it. */
-    padding-bottom: calc(var(--transport-height) + env(safe-area-inset-bottom));
+    /* §5 reserved a 64px band here for the transport bar. The bar is gone and
+       the controls that replaced it float in the top corner, so the band is
+       returned to the page — only the safe area still needs keeping clear. */
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   /* Specification §3.1 rule 6 and §10. Never removed. */

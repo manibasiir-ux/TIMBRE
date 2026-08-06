@@ -44,9 +44,31 @@ const servesHttps =
   (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://") ||
   process.env.VERCEL === "1";
 
+/**
+ * `'unsafe-eval'` in development only, and the asymmetry is the point.
+ *
+ * `next dev` serves every module through an `eval()` call — that is how the
+ * webpack `eval-source-map` devtool attaches a source map to each module — so a
+ * script-src without `'unsafe-eval'` blocks the entire client bundle. The
+ * symptom is not an error page: the server-rendered HTML arrives intact and
+ * looks correct, then nothing hydrates. No canvas, no audio, no working
+ * buttons, and a single EvalError in the console that is easy to read as noise.
+ *
+ * It went unnoticed for three commits because every check runs against
+ * `web-prod`. A production build contains no `eval()` at all, so the header
+ * that ships is unchanged and stays as strict as it was.
+ *
+ * If this ever needs relaxing for production, it does not. Find another way.
+ */
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+const scriptSrc = isDevelopment
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'";
+
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",

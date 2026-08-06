@@ -1,35 +1,51 @@
 /**
  * Audio consent persistence, FR-01.
  *
- * The choice is remembered for 180 days under `timbre.audio.consent`. Storage
- * and clock are injected so expiry can be tested without waiting six months,
- * and every access is wrapped: Safari in private mode throws on localStorage,
- * and a thrown error here would take down the consent gate, which is the first
- * thing a visitor sees.
+ * The choice lasts one browsing session, in `sessionStorage` under
+ * `timbre.audio.consent`. Answer it once and it stays answered while you move
+ * around the site; close the tab and the next visit asks again.
  *
- * A stored value is strictly "granted" or "declined". "pending" means no valid
- * record exists, so the gate should be shown.
+ * This deliberately replaces FR-01's 180 days in `localStorage`, and the reason
+ * is worth recording. One click wrote a record expiring six months later, so
+ * after a single visit the gate was never seen again — by anyone, including the
+ * people building the site. A screen that introduces the product, states the
+ * sound-off path exists, and supplies the gesture browsers require before any
+ * audio can play is not a cookie banner to be endured once and suppressed. For
+ * a studio whose product is sound, being asked at the start of a visit is the
+ * front door, not friction.
+ *
+ * Nothing here has a clock, because the session is the expiry. That removes the
+ * whole class of bug the previous version carried: no timestamps to compare, no
+ * boundary conditions, no records from a past that outlive their usefulness.
+ *
+ * Every access is wrapped. Safari in private mode throws on storage access, and
+ * an exception here would take down the first thing a visitor sees.
  */
 
 export type AudioConsent = "pending" | "granted" | "declined";
 
 export const CONSENT_KEY = "timbre.audio.consent";
-export const CONSENT_TTL_DAYS = 180;
-export const CONSENT_TTL_MS = CONSENT_TTL_DAYS * 24 * 60 * 60 * 1000;
 
-type StoredConsent = { value: "granted" | "declined"; expiresAt: number };
-
-function isStoredConsent(value: unknown): value is StoredConsent {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    (record.value === "granted" || record.value === "declined") &&
-    typeof record.expiresAt === "number" &&
-    Number.isFinite(record.expiresAt)
-  );
+function isChoice(value: unknown): value is "granted" | "declined" {
+  return value === "granted" || value === "declined";
 }
 
 function defaultStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where the previous implementation kept its 180-day record.
+ *
+ * Separate from `defaultStorage` because the two are different stores under the
+ * same key, and the old one now needs clearing rather than reading.
+ */
+function legacyStorage(): Storage | null {
   if (typeof window === "undefined") return null;
   try {
     return window.localStorage;
@@ -39,7 +55,6 @@ function defaultStorage(): Storage | null {
 }
 
 export function readConsent(
-  now: number = Date.now(),
   storage: Storage | null = defaultStorage(),
 ): AudioConsent {
   if (!storage) return "pending";
@@ -50,34 +65,22 @@ export function readConsent(
   } catch {
     return "pending";
   }
-  if (!raw) return "pending";
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    // Corrupt or hand-edited. Treat as absent and let it be overwritten.
-    return "pending";
-  }
-
-  if (!isStoredConsent(parsed)) return "pending";
-  if (parsed.expiresAt <= now) return "pending";
-
-  return parsed.value;
+  // Anything that is not one of the two answers — absent, corrupt, or
+  // hand-edited — means no choice has been made, so the gate should be shown.
+  return isChoice(raw) ? raw : "pending";
 }
 
 export function writeConsent(
   value: "granted" | "declined",
-  now: number = Date.now(),
   storage: Storage | null = defaultStorage(),
 ): void {
   if (!storage) return;
-  const record: StoredConsent = { value, expiresAt: now + CONSENT_TTL_MS };
   try {
-    storage.setItem(CONSENT_KEY, JSON.stringify(record));
+    storage.setItem(CONSENT_KEY, value);
   } catch {
-    // Quota or private mode. The choice still applies for this session; it
-    // simply will not survive a reload.
+    // Quota or private mode. The choice still holds in memory for this session;
+    // it simply will not survive a reload.
   }
 }
 
@@ -89,5 +92,24 @@ export function clearConsent(
     storage.removeItem(CONSENT_KEY);
   } catch {
     // Nothing useful to do.
+  }
+}
+
+/**
+ * Deletes the 180-day record the previous implementation wrote.
+ *
+ * Without this, anyone who visited the old site keeps a dead entry in
+ * localStorage until 2027. It suppresses nothing now — the gate reads
+ * sessionStorage — but leaving stale audio preferences on a visitor's machine
+ * to expire on their own is not a thing to do when removing them costs a line.
+ */
+export function purgeLegacyConsent(
+  storage: Storage | null = legacyStorage(),
+): void {
+  if (!storage) return;
+  try {
+    storage.removeItem(CONSENT_KEY);
+  } catch {
+    // Private mode. The record is unreadable to us anyway.
   }
 }

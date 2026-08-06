@@ -29,6 +29,30 @@ export function createBands(value = 0): Bands {
 }
 
 /**
+ * Band edges for the five-bar sound toggle, log-spaced over 40 Hz–2.8 kHz.
+ *
+ * Separate from `BAND_RANGES` because the two answer different questions. Those
+ * three bands drive a vertex shader and are chosen to describe a sound; these
+ * five drive a 16px meter and are chosen so that every bar has something to
+ * show on this site's own material.
+ *
+ * Measured on the bed across a full loop, median per band:
+ *
+ *     40-94 Hz    0.945      512-1198 Hz   0.280
+ *     94-219 Hz   0.848      1198-2800 Hz  0.119
+ *     219-512 Hz  0.688
+ *
+ * with 9-21% of travel each. The first attempt reached 8 kHz and left the top
+ * bar at a median of 0.003 — the air in this bed is quiet by design — which
+ * reads as a dead pixel rather than as an honest lack of treble. Re-measure
+ * these if the bed is ever retuned.
+ */
+export const METER_BAND_EDGES_HZ = [40, 94, 219, 512, 1198, 2800] as const;
+
+/** How many bars `METER_BAND_EDGES_HZ` describes. */
+export const METER_BAND_COUNT = METER_BAND_EDGES_HZ.length - 1;
+
+/**
  * Mean magnitude of the bins covering [fromHz, toHz], normalised to 0..1.
  *
  * `frequencyData` is the byte output of an AnalyserNode: one entry per bin,

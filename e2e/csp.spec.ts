@@ -35,6 +35,18 @@ test.describe("content security policy", () => {
 
     // No script from another origin, whatever is permitted inline.
     expect(policy).toContain("script-src 'self' 'unsafe-inline'");
+
+    /**
+     * The production half of a deliberate asymmetry.
+     *
+     * `next dev` evaluates every module through `eval()`, so development has to
+     * allow it or no client JavaScript runs at all — silently, since the
+     * server-rendered HTML still arrives looking correct. Production builds
+     * contain no `eval()`, so the shipped policy keeps the restriction.
+     *
+     * This suite runs against `web-prod`, which is what makes this assertion
+     * meaningful: it is checking the header real visitors receive.
+     */
     expect(policy).not.toContain("unsafe-eval");
   });
 

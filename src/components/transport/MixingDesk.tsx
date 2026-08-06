@@ -15,9 +15,15 @@ import { useExperience } from "@/store/useExperience";
  * The roadmap records three attempts. Vertical strips fought the vertically
  * scrolling page. A full-screen console trapped keyboard users in a mode they
  * had not noticed entering — "I got in. I could not get out." What shipped is
- * horizontal strips in a bottom sheet with the transport bar still visible
- * above them as the persistent anchor, so the desk always reads as a panel over
+ * horizontal strips in a bottom sheet that covers at most 70% of the viewport,
+ * so the page is always visible behind it and the desk reads as a panel over
  * the page rather than a mode replacing it.
+ *
+ * It sat above the transport bar until that bar was removed; it now sits on the
+ * bottom edge. The trigger moved to the top corner with the other controls, so
+ * the sheet no longer rises from beneath its own button — acceptable because
+ * the panel is what takes focus, and a menu opening from the bottom edge is the
+ * more familiar shape on the phones most of this traffic arrives on.
  *
  * Each fader is a real slider: role, min, max, now, and crucially aria-valuetext,
  * because a bare "40" told VoiceOver nothing about what was at forty or of what.
@@ -188,7 +194,7 @@ export function MixingDesk({
       role="dialog"
       aria-modal="true"
       aria-label="Mixing desk navigation"
-      className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-[8000] max-h-[min(70vh,620px)] overflow-y-auto border-t border-ink-15 bg-ground-lift/95 backdrop-blur-md"
+      className="fixed inset-x-0 bottom-0 z-[8000] max-h-[min(70vh,620px)] overflow-y-auto border-t border-ink-15 bg-ground-lift/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
     >
       <ul className="divide-y divide-ink-15">
         {SECTIONS.map((section, index) => {

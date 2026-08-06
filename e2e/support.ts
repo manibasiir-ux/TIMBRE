@@ -3,9 +3,12 @@ import type { Page } from "@playwright/test";
 /**
  * Shared helpers.
  *
- * Every test starts on a fresh context, so the consent gate is present on every
- * first navigation and has to be answered before anything else is reachable.
- * That is the point of the gate, not an obstacle to work around.
+ * Every test starts on a fresh context, which is a fresh session, so the gate is
+ * present on every first navigation and has to be answered before anything else
+ * is reachable. That is the point of the gate, not an obstacle to work around.
+ *
+ * Within one test the choice persists, so `visit` can be called repeatedly and
+ * only the first call sees a gate to answer.
  */
 
 export const ROUTES = [

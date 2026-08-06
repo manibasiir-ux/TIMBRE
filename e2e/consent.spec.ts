@@ -8,6 +8,11 @@ import { answerConsent } from "./support";
  * The gate is the one piece of the product with a legal edge: nothing may play
  * before an explicit gesture, and declining has to be a real choice rather than
  * a nudge toward the other button.
+ *
+ * The choice now lasts a session rather than 180 days, so two properties matter
+ * and pull in opposite directions: it must stay quiet while someone browses,
+ * and it must come back for the next visit. Both are asserted below, because
+ * getting either one wrong looks like the gate working.
  */
 
 test.describe("consent gate", () => {
@@ -79,6 +84,53 @@ test.describe("consent gate", () => {
 
     await page.reload();
     await expect(page.getByRole("dialog", { name: /timbre/i })).toBeHidden();
+  });
+
+  test("keeps the choice in the session, not on the machine", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await answerConsent(page, "silent");
+
+    const stored = await page.evaluate(() => ({
+      session: sessionStorage.getItem("timbre.audio.consent"),
+      local: localStorage.getItem("timbre.audio.consent"),
+    }));
+
+    expect(stored.session).toBe("declined");
+    /**
+     * The regression this pins.
+     *
+     * A single click used to write a localStorage record expiring 180 days
+     * later, so after one visit the gate was never seen again — by anyone,
+     * including the people building the site. If a value ever reappears here,
+     * the gate has silently gone back to being a one-time screen.
+     */
+    expect(stored.local).toBeNull();
+  });
+
+  test("asks again in a new session", async ({ browser }) => {
+    // A fresh context is a fresh session, which is what closing the tab and
+    // coming back gives a real visitor. Created by hand rather than through the
+    // page fixture, so baseURL has to be supplied.
+    const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+
+    const first = await browser.newContext({ baseURL });
+    const firstPage = await first.newPage();
+    await firstPage.goto("/");
+    await answerConsent(firstPage, "silent");
+    await expect(
+      firstPage.getByRole("dialog", { name: /timbre/i }),
+    ).toBeHidden();
+    await first.close();
+
+    const second = await browser.newContext({ baseURL });
+    const secondPage = await second.newPage();
+    await secondPage.goto("/");
+    await expect(
+      secondPage.getByRole("dialog", { name: /timbre/i }),
+    ).toBeVisible();
+    await second.close();
   });
 
   test("leaves the page fully readable after declining", async ({ page }) => {

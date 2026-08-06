@@ -4,7 +4,7 @@ import { SmoothScroll } from "@/app/providers/SmoothScroll";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { OrganizationSchema } from "@/components/seo/StructuredData";
 import { RouteWipe } from "@/components/transport/RouteWipe";
-import { TransportBar } from "@/components/transport/TransportBar";
+import { SiteControls } from "@/components/transport/SiteControls";
 import { SceneMount } from "@/components/webgl/SceneMount";
 import { SculptureRouteState } from "@/components/webgl/SculptureRouteState";
 import { fontVariables } from "@/lib/fonts";
@@ -106,9 +106,9 @@ export default function RootLayout({
           </main>
         </SmoothScroll>
 
-        {/* FR-06: persistent on every route, occupying the band the body has
-            reserved since the token layer. */}
-        <TransportBar />
+        {/* FR-06, amended: persistent on every route, but floating in a corner
+            rather than reserving a band of every screen. See SiteControls. */}
+        <SiteControls />
 
         {/* FR-01: nothing plays until this is answered. */}
         <ConsentGate />
