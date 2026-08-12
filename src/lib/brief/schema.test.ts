@@ -2,14 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   BUDGET_BANDS,
-  MAX_UPLOAD_BYTES,
   QUALIFIED_BANDS,
   SERVICE_LINES,
   STEPS,
   briefSchema,
   isQualified,
   scaleSchema,
-  validateUpload,
   whatSchema,
   whoSchema,
 } from "./schema";
@@ -23,7 +21,6 @@ const VALID = {
   moment: "The door close on our second-generation platform.",
   budget: "110-220" as const,
   targetDate: "Q3",
-  attachmentName: "",
   fax: "",
   turnstileToken: "",
 };
@@ -113,47 +110,20 @@ describe("qualification, per the north-star metric", () => {
   });
 });
 
-describe("upload validation, FR-16", () => {
-  it("accepts a PDF within the limit", () => {
-    expect(
-      validateUpload({ size: 1_000, type: "application/pdf", name: "a.pdf" }),
-    ).toBeNull();
-  });
-
-  it("accepts a ZIP", () => {
-    expect(
-      validateUpload({ size: 1_000, type: "application/zip", name: "a.zip" }),
-    ).toBeNull();
-  });
-
-  it("rejects anything over 25 MB and says how big it was", () => {
-    const problem = validateUpload({
-      size: MAX_UPLOAD_BYTES + 1,
-      type: "application/pdf",
-      name: "big.pdf",
+describe("the payload carries no attachment, FR-16 withdrawn", () => {
+  it("drops an attachment name rather than accepting one it cannot honour", () => {
+    // The regression this guards: the field was validated and its *name* was
+    // sent while the form told the visitor the file was "attached on send". If
+    // the key reappears in the parsed payload, either the upload was finished —
+    // in which case delete this test deliberately — or the claim is back
+    // without it.
+    const parsed = briefSchema.safeParse({
+      ...VALID,
+      attachmentName: "deck.pdf",
     });
-    expect(problem).toContain("25 MB");
-  });
 
-  it("accepts a file exactly at the limit", () => {
-    expect(
-      validateUpload({
-        size: MAX_UPLOAD_BYTES,
-        type: "application/pdf",
-        name: "edge.pdf",
-      }),
-    ).toBeNull();
-  });
-
-  it("rejects other types, whatever they are named", () => {
-    // An executable renamed to .pdf still reports its real MIME type.
-    expect(
-      validateUpload({
-        size: 10,
-        type: "application/x-msdownload",
-        name: "invoice.pdf",
-      }),
-    ).toBe("PDF or ZIP only.");
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && "attachmentName" in parsed.data).toBe(false);
   });
 });
 

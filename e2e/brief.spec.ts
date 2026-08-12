@@ -204,7 +204,6 @@ test.describe("brief form", () => {
         moment: "Filling in every field I can find.",
         budget: "220+",
         targetDate: "",
-        attachmentName: "",
         fax: "caught",
         turnstileToken: "",
       },

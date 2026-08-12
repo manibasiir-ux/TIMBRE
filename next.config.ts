@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { buildContentSecurityPolicy } from "./src/lib/security/csp";
+
 /**
  * Security headers, NFR-12 — with one documented deviation.
  *
@@ -62,24 +64,21 @@ const servesHttps =
  */
 const isDevelopment = process.env.NODE_ENV !== "production";
 
-const scriptSrc = isDevelopment
-  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-  : "script-src 'self' 'unsafe-inline'";
+/**
+ * Cloudflare Turnstile is allowed through the policy only where it is actually
+ * configured, mirroring the `servesHttps` conditional above.
+ *
+ * The alternative — allowing the origin unconditionally — would loosen
+ * `script-src` and `frame-src` on every deployment that never loads Turnstile,
+ * which is most of them, to save one boolean.
+ */
+const turnstile = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  scriptSrc,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "media-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  ...(servesHttps ? ["upgrade-insecure-requests"] : []),
-].join("; ");
+const contentSecurityPolicy = buildContentSecurityPolicy({
+  isDevelopment,
+  servesHttps,
+  turnstile,
+});
 const securityHeaders = [
   {
     key: "Strict-Transport-Security",

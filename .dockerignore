@@ -19,9 +19,7 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-01-PRD.md
-02-UIUX-Design-Spec.md
-03-Roadmap-and-Plan.md
+docs/
 AGENTS.md
 README.md
 LICENSE

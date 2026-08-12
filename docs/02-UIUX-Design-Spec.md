@@ -1,5 +1,16 @@
 # TIMBRE — UI/UX Design Specification
 
+> **TIMBRE is a fictional studio**, and this is a self-authored design
+> specification for a portfolio build. The brand, the reference clients and the
+> studio it describes are invented.
+>
+> The engineering in here is not. The colour ratios, the shader constants, the
+> geometry measurements and the signal-coverage figures were computed or
+> measured against the running code, and the blockquoted revision notes record
+> where the first draft of this document was wrong and what replaced it. Those
+> notes are the useful part: they are the difference between a specification and
+> a moodboard.
+
 **Project code:** 01-TIMBRE
 **Companion documents:** `01-PRD.md`, `03-Roadmap-and-Plan.md`
 **Stack:** Next.js (App Router, React 19) · Tailwind CSS v4 · GSAP + ScrollTrigger · react-three-fiber + drei · Lenis · Vercel
@@ -581,7 +592,22 @@ export function SoundSculpture({ detail = 48, gain = 1 }: { detail?: number; gai
 
 ## 8. Experimental navigation — the mixing desk
 
-**Resting state.** A 64px master transport bar fixed to the bottom of the viewport: `--color-ground-lift`, 1px `--color-ink-15` top border, `backdrop-filter: blur(16px)`. Left to right — play/pause (36px), a live stereo VU pair (2×4px columns, peak-hold caps in `--color-signal`), the current stem label in `--text-mono-xs`, elapsed/total timecode, a full-width scrub track, a mute toggle, and the desk toggle `≡ DESK`.
+> **Revision note — the resting state below no longer ships.** The 64px bar was
+> built and then cut at the product owner's direction; it read as a media player
+> attached to the site rather than as part of it. `SiteControls` replaced it: a
+> sound toggle and the desk trigger, squared into the top-right corner, present
+> on every route. Play/pause, the VU pair, the stem label, the timecode and the
+> scrub track are gone, and with them the reserved band at the foot of every
+> page — the desk now opens from the bottom edge itself.
+>
+> **Everything from "Open state." onward is unchanged and current.** The desk,
+> its seven channel strips, the fader behaviour, the keyboard map and the mobile
+> sheet are all as specified and all shipped. Only the bar the desk used to sit
+> on top of has gone. The full list of superseded clauses, across both
+> documents, is tabulated in the revision note under FR-07 in
+> [01-PRD.md](01-PRD.md).
+
+**Resting state.** *(superseded — see above.)* A 64px master transport bar fixed to the bottom of the viewport: `--color-ground-lift`, 1px `--color-ink-15` top border, `backdrop-filter: blur(16px)`. Left to right — play/pause (36px), a live stereo VU pair (2×4px columns, peak-hold caps in `--color-signal`), the current stem label in `--text-mono-xs`, elapsed/total timecode, a full-width scrub track, a mute toggle, and the desk toggle `≡ DESK`.
 
 **The scrub track is the scroll-progress indicator.** Its signal fill maps to `document` scroll progress, not audio position; audio position is a separate 2px inner marker. Dragging the track scrolls the document via `lenis.scrollTo`.
 

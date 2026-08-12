@@ -1,5 +1,17 @@
 # TIMBRE — Roadmap and Build Plan
 
+> **None of this happened.** There was no kickoff in a Hackney live room. Ines
+> Kovač, Douglas Ferreiro, Nour el-Amrani, Sam Okoye, Wren Baptiste and Kiri
+> Tanaka do not exist, and neither does the fourteen-week engagement they are
+> described as running. This document is fiction, written in past tense as a
+> planning device: a way of reasoning about sequencing, risk and trade-offs by
+> giving each decision an owner and a reason to have been argued about.
+>
+> It is the one document here most likely to be mistaken for a record, which is
+> why this note is the first thing in it. The build plan in the back half — the
+> component order, the dependency tranches, the CI gates, the risk table — is
+> real and was followed. The people are not.
+
 *A build story, told straight, with the receipts attached.*
 
 ---

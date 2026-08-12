@@ -8,17 +8,17 @@ import { CONFIRM_MNEMONIC } from "@/lib/audio/manifest";
 import {
   BUDGET_BANDS,
   type BriefPayload,
-  MAX_UPLOAD_BYTES,
   SERVICE_LINES,
   STEPS,
   briefSchema,
-  validateUpload,
 } from "@/lib/brief/schema";
 import { clearDraft, readDraft, writeDraft } from "@/lib/brief/storage";
 import { useExperience } from "@/store/useExperience";
 
+import { TURNSTILE_SITE_KEY, TurnstileWidget } from "./TurnstileWidget";
+
 /**
- * The brief form, specification §6.8 and FR-15 through FR-18.
+ * The brief form, specification §6.8, FR-15, FR-17 and FR-18.
  *
  * Four steps, each gated by its own slice of the shared schema, with the draft
  * written to storage on every change so a reload does not cost the answers.
@@ -106,7 +106,6 @@ export function BriefForm() {
     services: [],
     moment: "",
     targetDate: "",
-    attachmentName: "",
     fax: "",
     ...(initial?.values ?? {}),
   }));
@@ -115,7 +114,7 @@ export function BriefForm() {
   const [submitting, setSubmitting] = useState(false);
   const [reference, setReference] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const restored = initial !== null;
 
   const consent = useExperience((state) => state.consent);
@@ -179,24 +178,19 @@ export function BriefForm() {
     setErrors((prev) => ({ ...prev, services: undefined }));
   };
 
-  const onFile = (file: File | undefined) => {
-    if (!file) {
-      update({ attachmentName: "" });
-      setUploadError(null);
-      return;
-    }
-    const problem = validateUpload(file);
-    if (problem) {
-      setUploadError(problem);
-      update({ attachmentName: "" });
-      return;
-    }
-    setUploadError(null);
-    update({ attachmentName: file.name });
-  };
-
   const submit = async () => {
-    const result = briefSchema.safeParse(values);
+    // Turnstile is only a gate where it is configured. With no site key there
+    // is no widget, no token and nothing to wait for — and the server, with no
+    // secret, is not checking. Both halves key off the same absence.
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setSubmitError("Complete the human check below, then send.");
+      return;
+    }
+
+    // Merged here rather than kept in `values`, which is written to
+    // localStorage on every keystroke. A token lives 300 seconds; persisting
+    // one would restore a draft carrying a credential that expired days ago.
+    const result = briefSchema.safeParse({ ...values, turnstileToken });
     if (!result.success) {
       rejectStep();
       setSubmitError("Something above is incomplete.");
@@ -434,36 +428,11 @@ export function BriefForm() {
               onChange={set("targetDate")}
             />
 
-            <div>
-              <label
-                htmlFor="attachment"
-                className="block font-mono text-mono-xs text-ink-70"
-              >
-                Attachment (optional, PDF or ZIP, 25 MB max)
-              </label>
-              <input
-                id="attachment"
-                type="file"
-                accept="application/pdf,application/zip"
-                onChange={(event) => onFile(event.target.files?.[0])}
-                aria-describedby={uploadError ? "attachment-error" : undefined}
-                className="mt-3 block w-full font-mono text-mono-xs text-ink-70 file:mr-4 file:min-h-11 file:border file:border-ink-15 file:bg-transparent file:px-4 file:py-2 file:font-mono file:text-mono-xs file:text-ink"
-              />
-              {uploadError && (
-                <p id="attachment-error" className="mt-2 font-mono text-mono-xs text-peak">
-                  {uploadError}
-                </p>
-              )}
-              {values.attachmentName && !uploadError && (
-                <p className="mt-2 font-mono text-mono-xs text-ok">
-                  {values.attachmentName} — attached on send
-                </p>
-              )}
-            </div>
           </div>
         )}
 
         {step === 3 && (
+          <>
           <dl className="flex flex-col gap-6 border-t border-ink-15 pt-8">
             {[
               ["Name", values.name],
@@ -474,7 +443,6 @@ export function BriefForm() {
               ["The moment", values.moment],
               ["Budget", BUDGET_BANDS.find((b) => b.value === values.budget)?.label],
               ["Target date", values.targetDate || "—"],
-              ["Attachment", values.attachmentName || "—"],
             ].map(([label, value]) => (
               <div key={String(label)} className="grid grid-cols-3 gap-4">
                 <dt className="font-mono text-mono-xs text-ink-70">{label}</dt>
@@ -482,6 +450,10 @@ export function BriefForm() {
               </div>
             ))}
           </dl>
+
+          {/* Renders nothing unless a site key is configured. */}
+          <TurnstileWidget onToken={setTurnstileToken} />
+          </>
         )}
 
         {/* FR-17 honeypot. Hidden from everyone who is not a form filler. */}
@@ -555,8 +527,7 @@ export function BriefForm() {
       </noscript>
 
       <p className="mt-8 font-mono text-mono-xs text-ink-70">
-        Max upload {MAX_UPLOAD_BYTES / 1024 / 1024} MB. We keep briefs for 24
-        months, then delete them.
+        We keep briefs for 24 months, then delete them.
       </p>
     </section>
   );

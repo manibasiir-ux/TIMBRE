@@ -1,5 +1,16 @@
 # TIMBRE — Product Requirements Document
 
+> **TIMBRE is a fictional studio.** It has no clients, no staff and no revenue.
+> This document is a self-authored brief for a portfolio build — written as a
+> real PRD because a real PRD is the constraint worth building against, not
+> because any of it describes a business that exists.
+>
+> Everything below is invented: the personas and their quotes, the price bands,
+> the unit economics, the revenue mix and the success metrics. Read it as a
+> specification the code is held to, which it genuinely is — the requirement
+> numbers (FR-01, NFR-05 and the rest) are cited throughout the source and
+> asserted in the test suite — and not as a record of anything that happened.
+
 **Project code:** 01-TIMBRE
 **Product type:** Marketing + portfolio site for a B2B sonic identity studio
 **Stack:** Next.js (App Router, React 19) · Tailwind CSS v4 · GSAP + ScrollTrigger · Three.js via react-three-fiber + drei · Lenis · Vercel
@@ -163,7 +174,7 @@ The site's job in this model is to move inbound share from 20% to 45% of pipelin
 
 1. Step 1 — Who: name, company, role, email (validated on blur).
 2. Step 2 — What: multi-select of the six service lines; free text "what's the moment?" (280 char).
-3. Step 3 — Scale: budget band radio (Under £50k / £50–110k / £110–220k / £220k+ / Not yet defined), target date, optional upload (max 25 MB, PDF/ZIP).
+3. Step 3 — Scale: budget band radio (Under £50k / £50–110k / £110–220k / £220k+ / Not yet defined) and target date. *(The optional upload specified here was withdrawn — see the revision note under FR-16.)*
 4. Step 4 — Review and send. Honeypot + Turnstile verification runs invisibly.
 5. Success: the transport bar plays a bespoke 1.4s confirmation mnemonic; reference code `TMB-YYMMDD-XXX` is displayed and emailed.
 
@@ -242,8 +253,44 @@ The site's job in this model is to move inbound share from 20% to 45% of pipelin
 - **FR-03** The WebGL hero SHALL read the analyser's frequency data each frame and drive vertex displacement, emissive intensity and palette mix.
 - **FR-04** The hero sculpture SHALL morph geometry, material and palette when a Work rail item enters the viewport, transitioning over 1.2s.
 - **FR-05** The Three.js canvas SHALL be mounted once in the root layout and persist across all client-side route transitions.
-- **FR-06** The master transport bar SHALL persist on all routes at all breakpoints and SHALL reflect document scroll progress on its scrub track.
-- **FR-07** The transport bar SHALL provide play/pause, mute, elapsed/total time, a draggable scrubber, and the channel-desk toggle.
+- **FR-06** *(amended)* A persistent global control cluster SHALL be present on all routes at all breakpoints, reachable without scrolling.
+- **FR-07** *(amended)* That cluster SHALL provide a sound toggle and the channel-desk toggle.
+
+> **Revision note — the transport bar was removed, and these two requirements
+> were rewritten around what replaced it.**
+>
+> §8 of the design spec specified a 64px bar fixed to the bottom of every
+> viewport carrying play/pause, a stereo VU pair, the current stem label,
+> elapsed/total timecode, a full-width scrub track doubling as scroll progress,
+> a mute toggle and the desk trigger. It was built, shipped, and then cut at the
+> product owner's direction: the bar read as a media player bolted to a studio's
+> website rather than as part of it, and what was actually wanted from it was
+> the ability to turn the sound off.
+>
+> What ships instead is `SiteControls` — a sound toggle and the desk trigger,
+> squared off into the top-right corner, on every route. Deleted with the bar:
+> `TransportBar.tsx` and `Meter.tsx`, play/pause, the timecode, the scrubber,
+> the stem label and the VU pair. `body` no longer reserves a 64px band, and the
+> mixing desk now sits on the bottom edge rather than above one.
+>
+> The clauses this supersedes, so none of them is left quietly wrong:
+>
+> | Clause | Status |
+> |---|---|
+> | §1 vision, "a master transport bar pinned to the bottom" | superseded |
+> | §5 Must row, "persistent master transport bar" | the desk survives; the bar does not |
+> | Flow A step 4, "transport bar animates up from the bottom edge" | superseded |
+> | Flow B step 1, "the channel-strip toggle on the transport bar" | the trigger moved to the corner cluster |
+> | Flow C step 5, "the transport bar plays a 1.4s confirmation mnemonic" | the mnemonic still plays, from the form |
+> | E6, "transport shows STEM UNAVAILABLE" | no surface for it; the page still continues |
+> | NFR-03, "the transport bar reserves its 64px band from first paint" | the band is gone, so nothing reserves it |
+> | NFR-16, "full keyboard operation of transport bar and mixing desk" | holds, over a smaller surface |
+>
+> **FR-06 survives in substance and FR-07 does not.** The requirement that
+> mattered was a global control always within one interaction; the inventory of
+> what sat on it was a design decision wearing a requirement's clothes. Scroll
+> progress is still computed — `useScrollProgress` feeds the per-section meters
+> inside the desk — it simply has no scrub track to be drawn on any more.
 - **FR-08** The mixing-desk overlay SHALL render one channel strip per top-level section with a live position VU and a draggable fader.
 - **FR-09** Fader drag SHALL scrub within the target section's content and, on release, navigate to the corresponding scroll position.
 - **FR-10** The system SHALL detect WebGL2 support and GPU tier on first paint and select one of three render profiles (`high`, `medium`, `fallback`).
@@ -252,7 +299,26 @@ The site's job in this model is to move inbound share from 20% to 45% of pipelin
 - **FR-13** Case study URLs SHALL accept a `?t=<seconds>` parameter that seeks the primary player and auto-scrolls to it.
 - **FR-14** The Work index SHALL filter client-side by sector and service line without a route change, updating the URL via `history.replaceState`.
 - **FR-15** The Brief form SHALL validate per-step, block advancement on invalid input, and preserve state across steps and reloads.
-- **FR-16** The Brief form SHALL accept one file up to 25 MB (`application/pdf`, `application/zip`) uploaded to a signed Vercel Blob URL.
+- **FR-16** ~~The Brief form SHALL accept one file up to 25 MB (`application/pdf`, `application/zip`) uploaded to a signed Vercel Blob URL.~~ **Withdrawn.**
+
+> **Revision note — FR-16 was half-built, and half-built here meant untrue.**
+>
+> What shipped validated the file's size and real MIME type, put its *filename*
+> in the payload, and told the visitor "*filename* — attached on send". The file
+> itself was never uploaded anywhere. The one thing the feature announced was
+> the one thing it did not do, and the failure mode is silent on both sides: the
+> sender believes the deck arrived, and the studio never knows one was offered.
+>
+> Finishing it needs a signed upload target, an account to own the storage, and
+> a lifecycle for files that NFR-13's 24-month retention would then have to
+> cover. Removing it costs a field on step 3. For a portfolio build with no real
+> enquiries to receive, the second is the honest trade — an attachment nobody
+> sends is not worth an integration nobody exercises.
+>
+> Removed with it: `validateUpload`, `MAX_UPLOAD_BYTES`, `ACCEPTED_UPLOAD_TYPES`,
+> the `attachmentName` field on the payload, and `BLOB_READ_WRITE_TOKEN` from
+> `.env.example`. A test in `schema.test.ts` now asserts the key stays out of the
+> parsed payload, so the claim cannot come back without the upload behind it.
 - **FR-17** Brief submissions SHALL be protected by Cloudflare Turnstile and a honeypot field, delivered by email via Resend, and mirrored to a Slack webhook.
 - **FR-18** The system SHALL generate a reference code `TMB-YYMMDD-XXX` per submission and include it in the confirmation and autoresponder.
 - **FR-19** Journal content SHALL be authored in MDX in-repo and statically generated with ISR at a 3600s revalidation interval.

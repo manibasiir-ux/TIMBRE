@@ -1,13 +1,20 @@
 import { z } from "zod";
 
 /**
- * The brief payload, specification §6.8 and FR-15/FR-16/FR-17.
+ * The brief payload, specification §6.8 and FR-15/FR-17.
  *
  * One schema, validated in both places. The client uses it to decide whether a
  * step may advance; the route handler uses it because a client-side check is a
  * convenience, not a control — anything can POST to the endpoint. Sharing the
  * definition is what stops the two drifting apart, which is the usual way a form
  * ends up accepting something the server rejects.
+ *
+ * FR-16's attachment is deliberately absent. It was built as far as validating
+ * the file and sending its *name*, while the form told the visitor the file was
+ * "attached on send" — so the one thing the feature claimed was the one thing it
+ * did not do. Finishing it needs a signed upload target and an account to own
+ * it; the honest alternative was to remove it, which is what happened. See the
+ * revision note under FR-16 in docs/01-PRD.md.
  */
 
 export const SERVICE_LINES = [
@@ -36,9 +43,6 @@ export const QUALIFIED_BANDS: readonly BudgetBand[] = [
   "220+",
 ];
 
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-export const ACCEPTED_UPLOAD_TYPES = ["application/pdf", "application/zip"];
-
 /** Step 1 — who. */
 export const whoSchema = z.object({
   name: z.string().trim().min(2, "Please give us a name").max(80),
@@ -66,7 +70,6 @@ export const scaleSchema = z.object({
     { message: "Pick a band, or tell us it is undecided" },
   ),
   targetDate: z.string().trim().max(40).optional().or(z.literal("")),
-  attachmentName: z.string().trim().max(255).optional().or(z.literal("")),
 });
 
 export const briefSchema = whoSchema
@@ -94,19 +97,4 @@ export type StepId = (typeof STEPS)[number]["id"];
 
 export function isQualified(budget: BudgetBand): boolean {
   return QUALIFIED_BANDS.includes(budget);
-}
-
-/** Validates one upload against FR-16 without reading its contents. */
-export function validateUpload(file: {
-  size: number;
-  type: string;
-  name: string;
-}): string | null {
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return `That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is 25 MB.`;
-  }
-  if (!ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
-    return "PDF or ZIP only.";
-  }
-  return null;
 }

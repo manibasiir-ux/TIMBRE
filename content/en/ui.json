@@ -33,6 +33,13 @@
     "deskLabel": "Mixing desk navigation"
   },
 
+  "_disclosure": "TIMBRE is not a real studio and has never had a client. Everything on the site that looks like evidence — the four case studies, their results, the names in the credits, the client wall — was written for a portfolio build, and the audio is synthesised. Source comments said so; nothing a visitor could see did. These two lines are the correction, and they are prose rather than labels because they are read, not fitted into a control.",
+
+  "disclosure": {
+    "footer": "TIMBRE is a fictional studio and this site is a portfolio build. The clients, case studies, results and credits are invented, and every sound on it is synthesised.",
+    "case": "Illustrative case study. This client, its results and its credits are invented for a portfolio build."
+  },
+
   "home": {
     "heroLines": ["We make", "Brands", "Audible"],
     "heroLabel": "We make brands audible",

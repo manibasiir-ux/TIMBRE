@@ -20,7 +20,6 @@ function payload(): BriefPayload {
     moment: "Arrival, across thirty-one properties.",
     budget: "220+",
     targetDate: "",
-    attachmentName: "",
     fax: "",
     turnstileToken: "",
   };

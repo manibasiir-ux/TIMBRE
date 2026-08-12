@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { SmoothScroll } from "@/app/providers/SmoothScroll";
+import { SiteFooter } from "@/components/chrome/SiteFooter";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { OrganizationSchema } from "@/components/seo/StructuredData";
 import { RouteWipe } from "@/components/transport/RouteWipe";
@@ -105,6 +106,11 @@ export default function RootLayout({
             {children}
           </main>
         </SmoothScroll>
+
+        {/* After </main> on purpose: §10 puts the footer last in the keyboard
+            path, and this is the site's standing disclosure that the studio and
+            its clients are invented. */}
+        <SiteFooter />
 
         {/* FR-06, amended: persistent on every route, but floating in a corner
             rather than reserving a band of every screen. See SiteControls. */}

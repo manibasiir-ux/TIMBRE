@@ -6,6 +6,7 @@ import { WaveformRule } from "@/components/primitives/WaveformRule";
 import { BreadcrumbSchema } from "@/components/seo/StructuredData";
 import { CaseAudio } from "@/components/work/CaseAudio";
 import { CASES, caseBySlug, nextCase } from "@/content/cases";
+import { DEFAULT_LOCALE, getDictionary } from "@/lib/i18n";
 
 /**
  * Case study detail, specification §6.3.
@@ -50,6 +51,7 @@ export default async function CaseStudyPage({
   if (!entry) notFound();
 
   const next = nextCase(entry.slug);
+  const ui = getDictionary(DEFAULT_LOCALE);
 
   return (
     <>
@@ -77,6 +79,14 @@ export default async function CaseStudyPage({
             </div>
           ))}
         </dl>
+
+        {/* Ahead of the first invented claim rather than after it. This page
+            goes on to name results and credit people, and a reader deciding
+            what to believe should be told before they read it, not once they
+            have. */}
+        <p className="mt-12 max-w-[64ch] border-l-2 border-ink-15 pl-4 text-small text-ink-70">
+          {ui.disclosure.case}
+        </p>
       </section>
 
       <WaveformRule seed={5} />

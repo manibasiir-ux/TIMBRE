@@ -1,13 +1,21 @@
 # TIMBRE
 
 Marketing and portfolio site for a B2B sonic identity studio, where a single
-persistent WebGL sculpture reacts to live Web Audio analysis, the navigation is
-a mixing desk, and the bottom transport bar doubles as scroll progress.
+persistent WebGL sculpture reacts to live Web Audio analysis and the navigation
+is a mixing desk.
 
-Specification lives in [01-PRD.md](01-PRD.md),
-[02-UIUX-Design-Spec.md](02-UIUX-Design-Spec.md) and
-[03-Roadmap-and-Plan.md](03-Roadmap-and-Plan.md). The working agreement for
-coding agents is [AGENTS.md](AGENTS.md).
+> **TIMBRE is a fictional studio.** It has no clients and has never delivered a
+> project. The four case studies, their results, the names in the credits and
+> the client wall are invented, and every sound on the site is synthesised by
+> [scripts/generate-audio.mjs](scripts/generate-audio.mjs). This is a portfolio
+> build: the brand is made up so that the engineering has something real to be
+> measured against.
+
+The specification is self-authored and lives in [docs/](docs/) —
+[01-PRD.md](docs/01-PRD.md), [02-UIUX-Design-Spec.md](docs/02-UIUX-Design-Spec.md)
+and [03-Roadmap-and-Plan.md](docs/03-Roadmap-and-Plan.md), each carrying a note
+on what in it is invented and what is measured. The working agreement for coding
+agents is [AGENTS.md](AGENTS.md).
 
 **Stack:** Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · GSAP +
 ScrollTrigger · three.js via react-three-fiber + drei · Lenis · Zustand
