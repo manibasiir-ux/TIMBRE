@@ -5,7 +5,13 @@ sculpture deforms in real time against live Web Audio FFT data, persists across
 every route without the canvas ever remounting, and the navigation is a mixing
 desk rather than a menu.
 
-**Live:** not yet deployed — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+**Live:** <https://timbre-liard.vercel.app>
+
+The brief form is wired end to end in production: Cloudflare Turnstile verifies
+server-side, and submissions are delivered by Resend with a generated reference
+code. Verified from both directions — a browser submission arrives, and a
+scripted POST with no token is refused with `400 verification_failed`.
+Deployment runbook: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 > **TIMBRE is a fictional studio.** It has no clients and has never delivered a
 > project. The four case studies, their results, the names in the credits and
@@ -179,7 +185,9 @@ It is stated rather than quietly dropped.
 
 ## What I would do next
 
-1. **Deploy it.** The runbook is written; it needs accounts.
+1. **A custom domain, and a verified sender with it.** Until a domain is
+   verified in Resend, the form can only deliver to my own address — fine for a
+   demo, wrong for anything real.
 2. **Core Web Vitals and Lighthouse against real field data.** Never measured —
    a persistent canvas and a 235 KB three.js chunk is exactly the shape that
    misses LCP or INP, and I would rather find out than assume.
