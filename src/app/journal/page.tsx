@@ -20,7 +20,9 @@ export const revalidate = 3600;
 
 export const metadata: Metadata = {
   alternates: { canonical: "/journal" },
-  title: "Journal — TIMBRE",
+  // No suffix: the root layout's template appends "· TIMBRE", and carrying both
+  // rendered "Journal — TIMBRE · TIMBRE" in the tab and in search results.
+  title: "Journal",
   description:
     "Writing on sonic identity: what the work involves, what it costs, and what makes it survive handover.",
 };
