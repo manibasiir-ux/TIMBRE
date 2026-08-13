@@ -3,7 +3,13 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 import { CASES, stemFor } from "@/content/cases";
@@ -17,6 +23,16 @@ import {
 import { useExperience } from "@/store/useExperience";
 
 gsap.registerPlugin(ScrollTrigger);
+
+/**
+ * `useLayoutEffect` on the client, `useEffect` on the server.
+ *
+ * This component is server-rendered before it hydrates, and `useLayoutEffect`
+ * warns there. Nothing needs cleaning up during an SSR pass, so the fallback
+ * costs nothing.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
  * The work rail, specification §6.1 item 5 and FR-04.
@@ -188,7 +204,31 @@ export function WorkRail() {
   // playing over the case study and the bed stays ducked for good.
   useEffect(() => stopRailAudio, [stopRailAudio]);
 
-  useEffect(() => {
+  // A layout effect, not a passive one, because this pins.
+  //
+  // `pin: true` makes ScrollTrigger wrap the pinned element in a `pin-spacer`
+  // div — the element is reparented out from under React. React still believes
+  // the section is a direct child of what it rendered it into, so when this
+  // component unmounts (every navigation away from `/`, since the rail is a
+  // home-page section) React calls removeChild on the original parent and the
+  // browser throws:
+  //
+  //     NotFoundError: Failed to execute 'removeChild' on 'Node':
+  //     The node to be removed is not a child of this node.
+  //
+  // That exception escapes rendering, so the entire tree dies and the browser
+  // shows its own "This page couldn't load" screen instead of anything the site
+  // controls. `THREE.WebGLRenderer: Context Lost` follows as the canvas is torn
+  // down. Reloading always worked, which is what made this look like a network
+  // or hosting problem rather than a rendering one.
+  //
+  // React detaches a deleted subtree's DOM during the commit phase and flushes
+  // `useEffect` cleanups afterwards, so the teardown that unwraps the spacer
+  // arrived too late. `useLayoutEffect` cleanup runs synchronously in that same
+  // mutation phase, before React removes anything, so the section is back in
+  // its original parent by the time React looks for it. This is why
+  // `@gsap/react`'s `useGSAP` is built on `useLayoutEffect`.
+  useIsomorphicLayoutEffect(() => {
     const root = section.current;
     const rail = track.current;
     if (!root || !rail) return;
@@ -422,7 +462,9 @@ export function WorkRail() {
         return () => {
           revealCard.current = null;
           presence.disconnect();
-          timeline.scrollTrigger?.kill();
+          // kill(true) so the pin is reverted and the pin-spacer unwrapped,
+          // putting the section back under the parent React rendered it into.
+          timeline.scrollTrigger?.kill(true);
           timeline.kill();
           leaveRail();
         };

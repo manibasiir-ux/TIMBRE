@@ -3,7 +3,7 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import {
   SCULPTURE_SCROLL,
@@ -12,6 +12,40 @@ import {
 } from "@/lib/motion/sculptureMotion";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
+
+/**
+ * The split has to be undone before React touches the DOM it rewrote, and only
+ * a layout effect is early enough.
+ *
+ * SplitText replaces the text node inside each `[data-hero-line]` with one span
+ * per character. React still holds references to the nodes it rendered. When
+ * this component unmounts — which is every navigation away from `/`, since the
+ * hero exists only on the home page — React removes that subtree, and in React
+ * 18+ a deleted tree's DOM is detached during the commit phase while `useEffect`
+ * cleanups are flushed afterwards. So `split.revert()` arrived too late, React
+ * called `removeChild` on a node that was no longer where it had left it, and
+ * threw:
+ *
+ *     NotFoundError: Failed to execute 'removeChild' on 'Node':
+ *     The node to be removed is not a child of this node.
+ *
+ * That exception escapes React's rendering, so the whole tree dies and the
+ * browser shows its own "This page couldn't load" page rather than anything the
+ * site controls. `THREE.WebGLRenderer: Context Lost` follows as the canvas is
+ * torn down. Reloading always fixed it, which is what made it look like a
+ * network or deployment problem for so long — it is neither.
+ *
+ * `useLayoutEffect` cleanup runs synchronously in the mutation phase, before
+ * React detaches anything, so the original text is restored while React's
+ * references are still valid. This is the same reason `@gsap/react`'s `useGSAP`
+ * is built on `useLayoutEffect` rather than `useEffect`.
+ *
+ * Aliased because this component is server-rendered before it hydrates, and
+ * `useLayoutEffect` on the server warns. There is nothing to clean up during an
+ * SSR pass, so falling back to `useEffect` there costs nothing.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
  * The hero, specification §6.1 and §7.2.
@@ -28,12 +62,18 @@ gsap.registerPlugin(ScrollTrigger, SplitText);
 export function Hero() {
   const scope = useRef<HTMLElement>(null);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const root = scope.current;
     if (!root) return;
 
+    // Held outside the context so the cleanup below can revert them directly.
+    // Relying on `context.revert()` to reach a matchMedia created inside it —
+    // and through that to the split — left the DOM rewritten on unmount.
+    let media: ReturnType<typeof gsap.matchMedia> | null = null;
+    let split: SplitText | null = null;
+
     const context = gsap.context(() => {
-      const media = gsap.matchMedia();
+      media = gsap.matchMedia();
 
       media.add(
         {
@@ -65,7 +105,10 @@ export function Hero() {
           // <h1> instead, where it is permitted, and the lines are hidden from
           // assistive technology so the heading is announced once rather than
           // once per line or once per character.
-          const split = new SplitText("[data-hero-line]", {
+          // Scoped to the hero's own root. `gsap.context` scopes selector
+          // strings passed to gsap methods, but SplitText is constructed
+          // directly, so a bare selector queries the whole document.
+          split = new SplitText(root.querySelectorAll("[data-hero-line]"), {
             type: "chars",
             charsClass: "char",
             aria: "none",
@@ -119,7 +162,8 @@ export function Hero() {
           });
 
           return () => {
-            split.revert();
+            split?.revert();
+            split = null;
             intro.kill();
             scrub.kill();
             cue.kill();
@@ -129,7 +173,14 @@ export function Hero() {
       );
     }, root);
 
-    return () => context.revert();
+    return () => {
+      // Order matters: put the DOM back before anything else, while React's
+      // references to these nodes are still valid.
+      split?.revert();
+      split = null;
+      media?.revert();
+      context.revert();
+    };
   }, []);
 
   return (
