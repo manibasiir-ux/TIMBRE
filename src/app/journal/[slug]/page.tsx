@@ -38,10 +38,12 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const post = postBySlug(slug);
-  if (!post) return { title: "Not found — TIMBRE" };
+  if (!post) return { title: "Not found" };
 
   return {
-    title: `${post.title} — TIMBRE`,
+    // No " — TIMBRE" suffix here: the root layout's title template already
+    // appends "· TIMBRE", and carrying both rendered "…problem — TIMBRE · TIMBRE".
+    title: post.title,
     description: post.summary,
     alternates: { canonical: `/journal/${post.slug}` },
     openGraph: {

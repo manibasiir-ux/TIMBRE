@@ -13,17 +13,45 @@ import { WaveformRule } from "@/components/primitives/WaveformRule";
  * completely with no sound at all, which is the same standard the rest of the
  * site holds itself to.
  */
+/**
+ * Numbers arrive as strings, and that is a constraint of the pipeline rather
+ * than a preference.
+ *
+ * Written as MDX expression attributes — `seconds={0.8}` — they reach this
+ * component as `undefined`. Quoted attributes arrive intact. The post therefore
+ * rendered "0:NaN · LUFS" in its timecode and 640 `NaN`s into the waveform's
+ * SVG path, in the prerendered HTML, on a published page.
+ *
+ * So they are quoted in the MDX and parsed here. `numeric` throws rather than
+ * coercing to a default: `journal.ts` already fails the build for a post with
+ * no title instead of rendering a broken one, and a silent NaN is exactly the
+ * failure that shipped. A build error names the file; a NaN names nothing.
+ */
+function numeric(value: string | number, field: string, label: string): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(
+      `<Listen label="${label}"> has a non-numeric ${field}: ${JSON.stringify(value)}. ` +
+        `Quote it — seconds="0.8", not seconds={0.8}.`,
+    );
+  }
+  return parsed;
+}
+
 export function Listen({
   label,
-  seconds,
-  lufs,
+  seconds: rawSeconds,
+  lufs: rawLufs,
   transcript,
 }: {
   label: string;
-  seconds: number;
-  lufs: number;
+  seconds: string | number;
+  lufs: string | number;
   transcript: string;
 }) {
+  const seconds = numeric(rawSeconds, "seconds", label);
+  const lufs = numeric(rawLufs, "lufs", label);
+
   const timecode =
     seconds >= 60
       ? `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`
