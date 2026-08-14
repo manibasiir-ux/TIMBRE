@@ -130,6 +130,23 @@ export const NEUTRAL_IDENTITY: SculptureIdentity = identity({
 /** The grey the accent crossfades to when the visitor cannot hear anything. */
 export const SILENT_RGB = linearRgb(SILENT_ACCENT);
 
+/**
+ * The accent hex per case, as a colour rather than as linear RGB.
+ *
+ * `identity()` consumes the hex and keeps only the linear triple the shader
+ * needs, which is right for the shader and useless to CSS. The route transition
+ * has to draw in the same colour the sculpture is wearing, so the hex is named
+ * here and referenced below rather than written twice — a second copy would
+ * drift the moment one of them was retuned, and the drift would be invisible
+ * until someone noticed a case whose wipe disagreed with its own form.
+ */
+export const SCULPTURE_ACCENTS = {
+  kestrel: "#2E6BFF",
+  halcyon: "#2FBF57",
+  solene: "#C81E3A",
+  "aviation-carrier": "#F4F4F0",
+} as const;
+
 export const SCULPTURE_IDENTITIES: Readonly<
   Record<string, SculptureIdentity>
 > = {
@@ -145,7 +162,7 @@ export const SCULPTURE_IDENTITIES: Readonly<
     taper: 0,
     solid: 1,
     body: BODY,
-    accent: "#2E6BFF",
+    accent: SCULPTURE_ACCENTS.kestrel,
   }),
 
   // Cone. Carried in the mids because low frequency disappears under road
@@ -160,7 +177,7 @@ export const SCULPTURE_IDENTITIES: Readonly<
     taper: 1,
     solid: 1,
     body: BODY,
-    accent: "#2FBF57",
+    accent: SCULPTURE_ACCENTS.halcyon,
   }),
 
   // Cylinder. Eight and ten minute beds across thirty-one hotels: broad, slow,
@@ -178,7 +195,7 @@ export const SCULPTURE_IDENTITIES: Readonly<
     // A crimson rather than a scarlet. #E02418 was the first choice and sits
     // 49.5 from `peak` in RGB, close enough that a failed form field and a case
     // study would have read as the same colour; this is 75 away.
-    accent: "#C81E3A",
+    accent: SCULPTURE_ACCENTS.solene,
   }),
 
   // Pyramid. Anonymised until March, and the one form that is both hard-edged
@@ -193,7 +210,7 @@ export const SCULPTURE_IDENTITIES: Readonly<
     taper: 1,
     solid: 1,
     body: BODY,
-    accent: "#F4F4F0",
+    accent: SCULPTURE_ACCENTS["aviation-carrier"],
   }),
 };
 
