@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { SmoothScroll } from "@/app/providers/SmoothScroll";
+import { HomeMark } from "@/components/chrome/HomeMark";
 import { SiteFooter } from "@/components/chrome/SiteFooter";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { OrganizationSchema } from "@/components/seo/StructuredData";
@@ -92,6 +93,10 @@ export default function RootLayout({
         >
           {ui.labels.nav.skip}
         </a>
+
+        {/* §10's keyboard path is skip link -> logo -> desk toggle, so this sits
+            immediately after the skip link and hides itself on home. */}
+        <HomeMark />
 
         {/* FR-05: mounted once here, never unmounted, so route changes never
             rebuild the WebGL context. */}

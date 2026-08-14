@@ -7,8 +7,13 @@ import {
   SCULPTURE_SCROLL,
   sculptureMotion,
 } from "@/lib/motion/sculptureMotion";
+import { caseSlugOf } from "@/lib/motion/routeDialects";
 import { requestSculptureRender } from "@/lib/motion/sculptureRender";
-import { resetIdentity } from "@/lib/webgl/sculptureIdentity";
+import {
+  activeIdentity,
+  identityFor,
+  resetIdentity,
+} from "@/lib/webgl/sculptureIdentity";
 
 /**
  * Sets the sculpture's resting state for the current route.
@@ -34,10 +39,24 @@ export function SculptureRouteState() {
     sculptureMotion.orbit = SCULPTURE_SCROLL.orbitFrom;
     sculptureMotion.recede = isHome ? 0 : 1;
 
-    // Leaving home from inside the work rail would otherwise carry that
-    // client's identity onto every subsequent route, so a case study would
-    // open under whichever sculpture the rail happened to be holding.
-    resetIdentity();
+    // Identity follows the destination rather than being thrown away.
+    //
+    // This used to reset unconditionally, to stop the rail's current client
+    // leaking onto every subsequent route. That solved the leak by discarding
+    // all identity, which also meant clicking Kestrel in the rail opened
+    // Kestrel's case study under a neutral blob — the one place the form should
+    // obviously persist. Choosing by destination fixes both: a case study wears
+    // its own identity, everything else resets.
+    //
+    // It also fixes the case nobody was looking at. A case study opened from a
+    // shared link, with no rail involved, now arrives wearing its own form
+    // instead of the neutral one.
+    const slug = caseSlugOf(pathname);
+    if (slug) {
+      Object.assign(activeIdentity, identityFor(slug));
+    } else {
+      resetIdentity();
+    }
 
     // Under reduced motion the canvas renders on demand, so none of the above
     // reaches the screen without asking for a frame.
