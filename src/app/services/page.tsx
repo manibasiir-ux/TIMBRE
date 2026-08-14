@@ -74,7 +74,13 @@ export default function ServicesPage() {
                   </span>
                 </summary>
 
-                <div className="grid grid-cols-4 gap-4 pb-10 lg:grid-cols-12">
+                {/* pt-4 is clearance for the focus ring, not decoration. The
+                    summary's :focus-visible outline is drawn 3px outside its
+                    box with a 2px stroke, and this panel used to start on the
+                    summary's exact bottom edge — so the ring landed on top of
+                    the first line of text inside it. Measured: panel top and
+                    summary bottom were both 419. */}
+                <div className="grid grid-cols-4 gap-4 pt-4 pb-10 lg:grid-cols-12">
                   <p className="col-span-4 max-w-[56ch] text-body text-ink-70 lg:col-span-6 lg:col-start-2">
                     {line.description}
                   </p>
@@ -180,7 +186,8 @@ export default function ServicesPage() {
                 <summary className="min-h-11 cursor-pointer py-5 font-body text-h3 text-ink">
                   {item.q}
                 </summary>
-                <p className="max-w-[64ch] pb-6 text-body text-ink-70">
+                {/* Same focus-ring clearance as the service lines above. */}
+                <p className="max-w-[64ch] pt-4 pb-6 text-body text-ink-70">
                   {item.a}
                 </p>
               </details>
