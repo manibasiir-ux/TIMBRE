@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import {
-  MORPH_SECONDS,
   NEUTRAL_IDENTITY,
   activeIdentity,
 } from "@/lib/webgl/sculptureIdentity";
@@ -23,6 +22,19 @@ import { requestSculptureRender } from "@/lib/motion/sculptureRender";
  * It reverses on the way out rather than on unmount alone, because this is the
  * last section on the page and scrolling back up is the common path.
  */
+
+/**
+ * Deliberately not `MORPH_SECONDS`.
+ *
+ * The rail's 1.2s is fixed by FR-04 — a case study's morph is a described,
+ * specified duration and stays where it is. This collapse is a different job:
+ * the rail's morph happens while a card is being read, so it can take its time,
+ * while this one happens while the visitor is scrolling past and reads as lag
+ * rather than as weight. Both directions were sluggish at 1.2s, and the way out
+ * worse than the way in, because scrolling back up plays it against the
+ * visitor's own motion.
+ */
+const COLLAPSE_SECONDS = 0.7;
 
 /** A disc thin enough to read as a line, and the widest form in the set. */
 const FLATTENED = {
@@ -46,7 +58,7 @@ export function BriefSlab() {
     const morph = (to: Record<string, number>) => {
       gsap.to(activeIdentity, {
         ...to,
-        duration: MORPH_SECONDS,
+        duration: COLLAPSE_SECONDS,
         ease: "power2.inOut",
         overwrite: true,
         onUpdate: requestSculptureRender,
