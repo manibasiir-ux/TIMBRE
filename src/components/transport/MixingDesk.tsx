@@ -332,7 +332,7 @@ export function MixingDesk({
                   {section.label}
                 </Link>
               ) : (
-                <span className="inline-flex min-h-11 items-center font-mono text-mono-xs text-ink-40">
+                <span className="inline-flex min-h-11 items-center font-mono text-mono-xs text-ink-70">
                   {section.label}
                 </span>
               )}
