@@ -196,7 +196,7 @@ test.describe("reduced motion", () => {
 
     await page.getByRole("button", { name: "Soundscape architecture" }).click();
     await page
-      .getByLabel(/what is the moment/i)
+      .getByLabel(/what do you want to make audible/i)
       .fill("Arrival, across thirty-one properties.");
     await page.getByRole("button", { name: /continue/i }).click();
 

@@ -122,7 +122,7 @@ test.describe("brief form", () => {
 
     await page.getByRole("button", { name: "Product and UI sound" }).click();
     await page
-      .getByLabel(/what is the moment/i)
+      .getByLabel(/what do you want to make audible/i)
       .fill("Payment confirmation that lands before the animation does.");
     await page.getByRole("button", { name: /continue/i }).click();
 
@@ -171,7 +171,7 @@ test.describe("brief form", () => {
     await page.getByRole("button", { name: /continue/i }).click();
     await page.getByRole("button", { name: "Product and UI sound" }).click();
     await page
-      .getByLabel(/what is the moment/i)
+      .getByLabel(/what do you want to make audible/i)
       .fill("Payment confirmation that lands before the animation does.");
     await page.getByRole("button", { name: /continue/i }).click();
     await page

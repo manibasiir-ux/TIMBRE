@@ -54,6 +54,7 @@ class AudioEngine {
   /** Nested ducks must not un-duck early when only one player stops. */
   private duckDepth = 0;
   private muted = false;
+  private mixEngaged = false;
   private suspendedByVisibility = false;
   private visibilityHandler: (() => void) | null = null;
 
@@ -287,10 +288,67 @@ class AudioEngine {
     for (const id of [...this.voices.keys()]) this.stop(id, fadeSeconds);
   }
 
-  /** Crossfades the bed to a different stem, per user flow A step 6. */
+  /**
+   * Crossfades the bed to a different stem, per user flow A step 6.
+   *
+   * Refused while the desk owns the bed bus. The rail stopping every voice to
+   * swap in one stem is right when the bed is a single track and destructive
+   * when the visitor has built a mix of their own — losing their fader
+   * positions to a scroll they did not connect to the sound.
+   */
   crossfadeBed(toId: string, seconds = 1.2): boolean {
+    if (this.mixEngaged) return false;
     for (const id of [...this.voices.keys()]) this.stop(id, seconds);
     return this.play(toId, { loop: true, bus: "bed", fadeSeconds: seconds });
+  }
+
+  /**
+   * Hands the bed bus to the mixing desk.
+   *
+   * While engaged the rail stops swapping the bed, because the desk's faders
+   * are the authority on what is audible.
+   */
+  setMixEngaged(engaged: boolean): void {
+    this.mixEngaged = engaged;
+  }
+
+  get isMixEngaged(): boolean {
+    return this.mixEngaged;
+  }
+
+  /**
+   * Rides an already-playing voice's gain.
+   *
+   * Ramped rather than set, because a fader written straight to `gain.value`
+   * steps the waveform and clicks. 60ms is below the threshold where a drag
+   * feels laggy and above the one where it crackles.
+   */
+  setVoiceGain(id: string, value: number, seconds = 0.06): boolean {
+    const voice = this.voices.get(id);
+    const ctx = this.ctx;
+    if (!voice || !ctx) return false;
+
+    const target = this.muted ? 0 : Math.max(0, Math.min(1, value));
+    const now = ctx.currentTime;
+    voice.gain.gain.cancelScheduledValues(now);
+    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+    voice.gain.gain.linearRampToValueAtTime(target, now + seconds);
+    return true;
+  }
+
+  /**
+   * Starts a looping voice at a given level if it is not already running.
+   *
+   * Every channel on the desk plays continuously from the moment the mixer is
+   * engaged, most of them at zero. Starting them together is what keeps them
+   * phase-locked: the generator writes whole numbers of cycles per loop, so
+   * sources begun in the same call stay in step indefinitely. Starting one
+   * later, when its fader is first raised, would drop it in at whatever phase
+   * the others happened to be at.
+   */
+  ensureVoice(id: string, gain: number, bus: AudioBus = "bed"): boolean {
+    if (this.voices.has(id)) return true;
+    return this.play(id, { loop: true, bus, gain });
   }
 
   /** FR-12. Balanced by an equal number of releaseDuck calls. */

@@ -345,14 +345,14 @@ export function BriefForm() {
                 rows={4}
                 maxLength={280}
                 value={values.moment ?? ""}
-                placeholder="What is the moment?"
+                placeholder="What do you want to make audible?"
                 onChange={(event) => set("moment")(event.target.value)}
                 aria-invalid={errors.moment ? true : undefined}
                 aria-describedby={errors.moment ? "moment-error" : "moment-hint"}
                 className={FIELD_CLASS}
               />
               <label htmlFor="moment" className={LABEL_CLASS}>
-                What is the moment?
+                What do you want to make audible?
               </label>
               <p id="moment-hint" className="mt-2 font-mono text-mono-xs text-ink-70 tabular-nums">
                 {(values.moment ?? "").length} / 280
@@ -440,7 +440,7 @@ export function BriefForm() {
               ["Role", values.role || "—"],
               ["Email", values.email],
               ["Needs", (values.services ?? []).join(", ")],
-              ["The moment", values.moment],
+              ["What to make audible", values.moment],
               ["Budget", BUDGET_BANDS.find((b) => b.value === values.budget)?.label],
               ["Target date", values.targetDate || "—"],
             ].map(([label, value]) => (
