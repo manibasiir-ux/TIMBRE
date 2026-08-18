@@ -43,13 +43,18 @@ test.describe("mixing desk", () => {
     ).toBeFocused();
   });
 
-  test("shows a channel per section with slider semantics", async ({ page }) => {
+  test("shows a channel per mix source with slider semantics", async ({
+    page,
+  }) => {
     await visit(page, "/");
     await page.keyboard.press("m");
 
     const desk = page.getByRole("dialog", { name: /mixing desk navigation/i });
     const sliders = desk.getByRole("slider");
-    await expect(sliders).toHaveCount(7);
+    // Five audio channels — the room and four client stems — rather than one
+    // per section. The faders ride gain nodes now; sections moved to the nav
+    // row beneath, which is also the whole desk with sound off.
+    await expect(sliders).toHaveCount(5);
 
     const first = sliders.first();
     await expect(first).toHaveAttribute("aria-valuemin", "0");
@@ -91,22 +96,18 @@ test.describe("mixing desk", () => {
     await visit(page, "/");
     await page.keyboard.press("m");
 
-    const desk = page.getByRole("dialog", { name: /mixing desk navigation/i });
+    const nav = page.getByRole("navigation", { name: /sections/i });
 
-    // This used to assert that Journal specifically was disabled, which stopped
-    // being true the moment Journal shipped. The rule was never about Journal:
-    // a channel that 404s is worse than one that says so. So it is asserted as
-    // the rule — every enabled channel has a link, every disabled one does not
-    // — which holds however many sections exist.
-    for (const strip of await desk.getByRole("listitem").all()) {
-      const slider = strip.getByRole("slider");
-      const disabled = await slider.getAttribute("aria-disabled");
-      const links = await strip.getByRole("link").count();
-
-      if (disabled === "true") {
-        expect(links, "a disabled channel must not link anywhere").toBe(0);
-      } else {
-        expect(links, "an enabled channel must lead somewhere").toBe(1);
+    // The rule survives its move. It was never about Journal, or about faders:
+    // a destination that 404s is worse than one that says so. Sections now live
+    // in the nav row, so that is where it is asserted — every section is either
+    // a link or plain text, and never a link to nowhere.
+    for (const item of await nav.getByRole("listitem").all()) {
+      const links = await item.getByRole("link").count();
+      const label = (await item.textContent())?.trim() ?? "";
+      expect(links, `${label} must be a link or plain text`).toBeLessThan(2);
+      if (links === 1) {
+        await expect(item.getByRole("link")).toHaveAttribute("href", /^\//);
       }
     }
   });
@@ -122,10 +123,11 @@ test.describe("mixing desk", () => {
     });
 
     await page.keyboard.press("m");
+    // Navigation moved from a Go link on each strip to the section row beneath
+    // the mixer, so this now clicks the section by name.
     await page
-      .getByRole("dialog", { name: /mixing desk navigation/i })
-      .getByRole("link", { name: /go/i })
-      .nth(1)
+      .getByRole("navigation", { name: /sections/i })
+      .getByRole("link", { name: /^work$/i })
       .click();
 
     await expect(page).toHaveURL(/\/work$/);
