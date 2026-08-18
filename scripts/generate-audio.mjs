@@ -535,11 +535,18 @@ function main() {
     `  bed.wav            ${BED_SECONDS}s  ${bed.measured.toFixed(2)} LUFS`,
   );
 
+  // Stems sit 3 dB above the bed.
+  //
+  // The synthesis is untouched — these are the same tones they have always
+  // been. At the bed's own -18 they simply sat too quiet to hold their own
+  // against it on the mixing desk, where the point is holding one up against
+  // the other. 3 dB is the smallest step that reads as "louder" rather than as
+  // a level error, and normalisation still guarantees the peak headroom, so
+  // nothing clips.
+  const STEM_LUFS = TARGET_LUFS + 3;
+
   for (const { id, rootHz, seconds } of STEMS) {
-    const stem = normaliseToLufs(
-      synthesiseStem(seconds, rootHz),
-      TARGET_LUFS,
-    );
+    const stem = normaliseToLufs(synthesiseStem(seconds, rootHz), STEM_LUFS);
     writeFileSync(
       join(AUDIO_DIR, `stem-${id}.wav`),
       encodeWav(stem.samples, SAMPLE_RATE),

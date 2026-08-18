@@ -64,6 +64,15 @@ export function MixingDesk({
   const panel = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [dragging, setDragging] = useState<string | null>(null);
+  /**
+   * The same drag, held twice, and the duplication is the fix.
+   *
+   * Gating pointermove on React state meant every move waited for a render to
+   * land before it counted, so a fast drag outran its own handler and the cap
+   * fell behind the finger. A ref updates in the same tick as the event. State
+   * is kept only for the colour, where a frame late is invisible.
+   */
+  const draggingRef = useRef<string | null>(null);
 
   const close = useCallback(() => {
     setDeskOpen(false);
@@ -205,27 +214,84 @@ export function MixingDesk({
     }
   };
 
-  const scrubFromPointer = (
-    event: React.PointerEvent<HTMLDivElement>,
-    id: string,
-  ) => {
-    const rail = event.currentTarget.getBoundingClientRect();
-    if (rail.width === 0) return;
-    applyLevel(id, (event.clientX - rail.left) / rail.width);
-  };
+  /**
+   * The rail being dragged, so a window-level move can measure it.
+   *
+   * Held as an element rather than a rect: the desk scrolls, so a rect captured
+   * on pointerdown goes stale the moment anything moves.
+   */
+  const dragRail = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * The drag runs on window listeners, not on the element.
+   *
+   * The first attempt used `setPointerCapture` and handlers on the fader
+   * itself. Capture was being lost on the re-render that the drag's own state
+   * update triggers, after which every pointermove and the pointerup went to
+   * whatever happened to be under the cursor instead of the fader. That single
+   * fault produced both symptoms at once: the cap stopped following the
+   * pointer, and its own pointerup never arrived, so it stayed signal-yellow
+   * claiming a grip on a pointer that had been released.
+   *
+   * Window listeners have no such failure mode. They fire wherever the pointer
+   * is, including outside the window, and they are torn down by the effect
+   * rather than by an event that might never come.
+   */
+  useEffect(() => {
+    if (!dragging) return;
+    const rail = dragRail.current;
+    if (!rail) return;
+
+    const move = (event: PointerEvent) => {
+      const box = rail.getBoundingClientRect();
+      if (box.width === 0) return;
+      const value = Math.max(
+        0,
+        Math.min(1, (event.clientX - box.left) / box.width),
+      );
+      setMixLevel(dragging, value);
+      setLevels((current) => ({ ...current, [dragging]: value }));
+    };
+
+    const end = () => {
+      draggingRef.current = null;
+      setDragging(null);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    // A drag interrupted by the tab going away should not survive the return.
+    window.addEventListener("blur", end);
+
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      window.removeEventListener("blur", end);
+    };
+  }, [dragging]);
 
   const onFaderPointerDown = (
     event: React.PointerEvent<HTMLDivElement>,
     id: string,
   ) => {
     if (!audible) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    dragRail.current = event.currentTarget;
+    draggingRef.current = id;
     setDragging(id);
-    scrubFromPointer(event, id);
+
+    const box = event.currentTarget.getBoundingClientRect();
+    if (box.width > 0) {
+      applyLevel(id, (event.clientX - box.left) / box.width);
+    }
+
     // NFR-14 measures this because a fader nobody moves is a metaphor that has
     // not landed.
     track("fader_dragged");
   };
+
 
   if (!deskOpen) return null;
 
@@ -286,15 +352,13 @@ export function MixingDesk({
                 aria-label={`${channel.label} level`}
                 aria-disabled={!audible}
                 onKeyDown={(event) => onFaderKeyDown(event, index, channel.id)}
+                // Only the start. Everything after it is on the window, so a
+                // drag survives leaving the strip, the desk, or the window.
                 onPointerDown={(event) => onFaderPointerDown(event, channel.id)}
-                onPointerMove={(event) =>
-                  dragging === channel.id
-                    ? scrubFromPointer(event, channel.id)
-                    : undefined
-                }
-                onPointerUp={() => setDragging(null)}
                 onFocus={() => setFocusedIndex(index)}
-                className={`relative flex h-11 flex-1 items-center ${
+                // touch-none so a drag on a phone moves the fader instead of
+                // scrolling the sheet out from under it.
+                className={`relative flex h-11 flex-1 touch-none items-center ${
                   audible ? "cursor-pointer" : "cursor-not-allowed"
                 }`}
               >
