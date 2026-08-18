@@ -36,7 +36,12 @@ export function HomeMark() {
       href="/"
       data-home-mark
       aria-label={ui.a11y.homeLabel}
-      className="fixed top-4 left-4 z-[9000] inline-flex min-h-11 items-center px-3 font-display text-mono tracking-[0.14em] text-ink-70 uppercase transition-colors duration-[var(--dur-quick)] hover:text-signal focus-visible:text-signal sm:top-6 sm:left-6"
+      // Anchored into the corner with a ground panel behind it, mirroring
+      // SiteControls on the right. Floating bare text over the page looked
+      // cleaner at rest and collided the moment anything scrolled under it —
+      // a case study's client name is set at text-mega and passed straight
+      // through the wordmark. Chrome needs to read as chrome.
+      className="fixed top-0 left-0 z-[9000] inline-flex min-h-11 items-center border-r border-b border-ink-15 bg-ground/80 px-4 font-display text-mono tracking-[0.14em] text-ink-70 uppercase backdrop-blur-md transition-colors duration-[var(--dur-quick)] hover:text-signal focus-visible:text-signal"
     >
       TIMBRE
     </Link>

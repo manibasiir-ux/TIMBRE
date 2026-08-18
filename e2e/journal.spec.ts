@@ -83,12 +83,17 @@ test.describe("journal", () => {
     await visit(page, "/");
     await page.keyboard.press("m");
 
-    const desk = page.getByRole("dialog", { name: /mixing desk navigation/i });
-    const journal = desk.getByRole("slider", { name: /journal/i });
+    // It shipped disabled for months. Being reachable from the desk is the
+    // whole point of building the route.
+    //
+    // The desk's faders became audio channels, so sections moved to the nav row
+    // beneath the mixer. The assertion follows them: Journal is a real link
+    // there, not inert text.
+    const journal = page
+      .getByRole("navigation", { name: /sections/i })
+      .getByRole("link", { name: /^journal$/i });
 
-    // It shipped disabled for months. The channel existing is the whole point
-    // of building the route.
-    await expect(journal).not.toHaveAttribute("aria-disabled", "true");
+    await expect(journal).toHaveAttribute("href", "/journal");
   });
 
   test("teases the two most recent posts on the homepage", async ({ page }) => {
