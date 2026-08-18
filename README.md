@@ -1,17 +1,11 @@
 # TIMBRE
 
 **A marketing site where the interface is driven by sound.** A single WebGL
-sculpture deforms in real time against live Web Audio FFT data, persists across
+sculpture deforms in real time against live Web Audio analysis, persists across
 every route without the canvas ever remounting, and the navigation is a mixing
-desk rather than a menu.
+desk whose faders ride real gain nodes.
 
 **Live:** <https://timbre-liard.vercel.app>
-
-The brief form is wired end to end in production: Cloudflare Turnstile verifies
-server-side, and submissions are delivered by Resend with a generated reference
-code. Verified from both directions — a browser submission arrives, and a
-scripted POST with no token is refused with `400 verification_failed`.
-Deployment runbook: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 > **TIMBRE is a fictional studio.** It has no clients and has never delivered a
 > project. The four case studies, their results, the names in the credits and
@@ -21,70 +15,90 @@ Deployment runbook: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ---
 
+![The TIMBRE homepage: the words "We make Brands Audible" set in enormous type over a dark studio-grey ground, with an audio-reactive WebGL sculpture glowing acid yellow behind them.](docs/screenshots/01-hero.jpg)
+
 ## What it does
 
 - **Audio-reactive hero.** One `AudioContext`, one `AnalyserNode`
   (`fftSize: 2048`), three normalised frequency bands driving vertex
   displacement, emissive mix and palette in a GLSL shader.
-- **One canvas, every route.** The `<Canvas>` is mounted once in the root layout
-  and driven from a Zustand store rather than route props, so navigating from
-  the homepage to a case study never rebuilds the WebGL context.
-- **Mixing-desk navigation.** A bottom-sheet overlay with one channel strip per
-  section, each with a live position meter and a draggable fader, fully
-  keyboard-operable and focus-trapped.
+- **One canvas, every route.** The canvas mounts once in the root layout and is
+  driven from a Zustand store rather than route props, so navigating never
+  rebuilds the WebGL context.
+- **A mixing desk that mixes.** Five channels — the room and four client stems —
+  with faders writing real gain values. Because the analyser sits *after* the
+  master gain, the sculpture reshapes itself against whatever mix you build.
+
+- **Per-destination route transitions.** One motion grammar, four dialects: case
+  studies sweep in their own accent colour, Services in six blades for six
+  service lines, Brief in four for four form steps, and going back always
+  travels the opposite way to going forward.
 - **Consent-gated audio with full sound-off parity.** Nothing plays before an
   explicit gesture. Decline, and the sculpture keeps moving from a baked FFT
-  envelope committed as a 3 KB JSON — the visual thesis survives silence.
-- **Three render profiles from a capability probe**, chosen before the canvas
+  envelope committed as a 3 KB JSON.
+- **Three render profiles** chosen by a capability probe before the canvas
   mounts, with automatic step-down when the rolling frame rate drops.
 - **Reduced motion as a designed path**, not a stripped one: Lenis never
   constructs, scrubs become discrete states, the sculpture composes to a fixed
-  pose, and every route still renders its content.
+  pose, every route still renders its content.
 - **A brief form** with per-step validation, draft persistence, rate limiting,
-  honeypot, Turnstile verification and transactional delivery.
+  honeypot, Cloudflare Turnstile verification and delivery via Resend.
+
+![The mixing desk open over the site: five horizontal channel strips labelled Room, Kestrel, Halcyon, Solene and Aviation, each with a six-segment meter, a fader and a numeric level, sitting above a row of section links.](docs/screenshots/02-desk.jpg)
+
+*The desk, mid-mix. Every fader writes a real gain node, and the analyser sits
+after the master gain — so the sculpture behind it is reacting to whatever you
+just built.*
+
+<p>
+  <img src="docs/screenshots/04-brief.jpg" width="66%" alt="Step two of the four-step brief form, showing a segmented progress bar, service-line toggles and the question 'What do you want to make audible?'" />
+  <img src="docs/screenshots/05-mobile.jpg" width="24%" align="top" alt="The manifesto at a narrow mobile width, three statements set in large type." />
+</p>
 
 ## Architecture
 
-The four decisions that shaped everything else.
+The decisions that shaped everything else.
 
 **One RAF loop, and a written hierarchy.** Lenis, GSAP ScrollTrigger and
 react-three-fiber each want to own `requestAnimationFrame`. Running all three
-produced scroll jitter that no individual component was responsible for. The fix
-was a rule rather than a patch: **Lenis drives, the GSAP ticker is the only RAF
+produced scroll jitter that no single component was responsible for. The fix was
+a rule rather than a patch: **Lenis drives, the GSAP ticker is the only RAF
 loop, R3F subscribes to it**, with `lagSmoothing(0)` so a dropped frame never
 desynchronises scrub position from scroll position.
 
-**The canvas is state, not markup.** Mounted once in `app/layout.tsx` via
-`next/dynamic` with `ssr: false`, and everything about it — active case study,
-render profile, whether anything is audible — lives in a Zustand store. Route
+**The canvas is state, not markup.** Mounted once via `next/dynamic` with
+`ssr: false`; active case, render profile and audibility live in a store. Route
 transitions become a wipe over a continuously rendering scene.
+
+![The Kestrel case study: the client name set at display size, a mono spec block reading Sector Fintech, Package Identity, Year 2025, and the same sculpture rendered as a blue cube — the per-case identity carried through from the work rail.](docs/screenshots/03-case-study.jpg)
 
 **The audio graph is a singleton with a real mixer.** Master gain, analyser,
 per-source gains, and a ducking helper that counts nesting depth so two
-overlapping players cannot un-duck each other early.
+overlapping players cannot un-duck each other early. Voices are named
+independently of buffers, so the work rail can audition a stem while the desk
+holds the same file as a channel.
 
-**Content is typed where it is structured and MDX where it is prose.** Case
-studies are a filled-in template — sector, package, an asset inventory with
-loudness and formats, three context players, metrics, credits — so they are
-TypeScript, checked at build time, and the index can filter and count without
-parsing anything. The journal is genuinely prose, so it is MDX.
+**Content is typed where structured, MDX where prose.** Case studies are a
+filled-in template — sector, package, asset inventory with loudness and formats,
+metrics, credits — so they are TypeScript, checked at build time. The journal is
+genuinely prose, so it is MDX.
 
 ```
 src/
-  app/            routes · api/brief · sitemap, robots, opengraph-image
+  app/            routes, api/brief, sitemap, robots, opengraph-image
   components/
-    webgl/        SceneMount → SceneRoot → SoundSculpture (shader)
-    transport/    SiteControls, MixingDesk, RouteWipe
+    webgl/        SceneMount -> SceneRoot -> SoundSculpture (shader)
+    transport/    MixingDesk, SiteControls, RouteWipe
     brief/        BriefForm, TurnstileWidget
-    chrome/       SiteFooter
+    chrome/       HomeMark, SiteFooter
   lib/
-    audio/        AudioEngine, analyser bands, consent, baked envelope
-    webgl/        capability probe, profiles, shader tuning constants
+    audio/        AudioEngine, mixer, analyser bands, consent, baked envelope
+    motion/       route dialects, sculpture motion, reveals
+    webgl/        capability probe, profiles, shader tuning, identities
     brief/        schema, delivery adapters, rate limiters, storage
     security/     CSP builder
-  content/        case studies (typed), clients
 content/
-  en/ui.json      all UI copy, externalised (NFR-15)
+  en/ui.json      all UI copy, externalised
   journal/        MDX posts
 ```
 
@@ -92,13 +106,13 @@ content/
 
 | Choice | Reasoning | Rejected |
 |---|---|---|
-| **Next.js 16 App Router** | Case-study copy must be in the initial HTML for SEO while the hero stays client-only. Server components give both without a second rendering strategy. | Vite SPA — would have put every indexable word behind hydration |
-| **react-three-fiber** | The sculpture's state is React state (active case, profile, audio bands). Reconciling it declaratively beats hand-syncing an imperative scene graph. | Raw three.js — more control, but the store would need mirroring by hand |
-| **GSAP + ScrollTrigger** | `containerAnimation` drives triggers *inside* a horizontally-pinned rail. No CSS-only or IntersectionObserver approach does this. | Framer Motion — excellent for components, no equivalent scrub model |
-| **Zustand** | The canvas is outside the route tree, so context would mean lifting providers above the layout. A store is simply the right shape. | Context — provider gymnastics for a global singleton |
-| **Zod, shared client and server** | One schema gates step advancement *and* validates the endpoint, so the two cannot drift and accept different payloads. | Separate validators — the usual way a form accepts what the server rejects |
-| **`fetch` over Resend/Upstash/Turnstile SDKs** | Each is one endpoint, a bearer token and a JSON body. Three fewer dependencies to audit and update for no capability. | The official SDKs |
-| **Docker for everything** | Nothing is installed on the host and CI runs the same image, so "works on my machine" cannot diverge from "works in CI". | Local Node + nvm |
+| **Next.js 16 App Router** | Case-study copy must be in the initial HTML for SEO while the hero stays client-only. Server components give both without a second rendering strategy. | Vite SPA, which puts every indexable word behind hydration |
+| **react-three-fiber** | The sculpture's state *is* React state. Reconciling it declaratively beats hand-syncing an imperative scene graph. | Raw three.js: more control, more manual mirroring |
+| **GSAP + ScrollTrigger** | `containerAnimation` drives triggers *inside* a horizontally-pinned rail. Nothing CSS-only does this. | Framer Motion, excellent for components but with no equivalent scrub model |
+| **Zustand** | The canvas lives outside the route tree, so context would mean lifting providers above the layout. | React context |
+| **Zod, shared client and server** | One schema gates step advancement *and* validates the endpoint, so the two cannot drift. | Separate validators, which is how forms come to accept what servers reject |
+| **`fetch` over the Resend, Upstash and Turnstile SDKs** | Each is one endpoint, a bearer token and a JSON body. Three fewer dependencies to audit. | The official SDKs |
+| **Docker for everything** | CI runs the same image as development, so "works on my machine" cannot diverge from "works in CI". | Local Node with nvm |
 
 ## Running it
 
@@ -109,39 +123,38 @@ to be.
 docker compose run --rm cli "npm install" && docker compose up web
 ```
 
-The dev server is then on <http://localhost:3000>. The install is only needed on
-a clean clone — `node_modules` lives in a named volume, not on the bind mount.
+Then <http://localhost:3000>. The install is only needed on a clean clone —
+`node_modules` lives in a named volume, not on the bind mount.
 
 | Task | Command |
 |---|---|
 | Dev server | `docker compose up web` |
 | Full static gate | `docker compose run --rm cli "npm run verify"` |
 | Unit tests | `docker compose run --rm cli "npm test"` |
-| End-to-end | `docker compose --profile tools up -d web-prod` then `docker compose run --rm e2e "npx playwright test"` |
+| End-to-end | `docker compose --profile tools up -d web-prod`, then `docker compose run --rm e2e "npx playwright test"` |
 | Stop everything | `docker compose --profile tools down` |
 
 Copy [.env.example](.env.example) to `.env.local` if you want the integrations.
-Every one of them degrades to a working local stub when its key is absent, so
-development works with the file untouched.
+**Every one degrades to a working local stub when its key is absent**, so
+development works with the file untouched: the form still validates, rate-limits
+and returns a reference code, and logs what it would have emailed.
 
 ### Why the container is shaped the way it is
 
-Three decisions look odd without the reasoning, and all three were measured.
-
 **`node_modules` lives in a named volume.** The source is bind-mounted from
-Windows into the WSL2 VM, and every file operation on that mount crosses the VM
+Windows into WSL2, and every file operation on that mount crosses the VM
 boundary. `.next` deliberately stays on the bind mount, because Turbopack splits
 its state between `.next` and `.next-internal` and separating them breaks
 recompilation.
 
 **`npm run dev` passes `--webpack`.** inotify events do not survive the
-Windows-to-Linux mount boundary. Turbopack's watcher did not fire even with
-polling configured; webpack's polling watcher does. Builds still use Turbopack,
-which is unaffected because it does not watch.
+Windows-to-Linux mount boundary. Turbopack's watcher never fired even with
+polling configured; webpack's does. Builds still use Turbopack, unaffected
+because they do not watch.
 
 **`NODE_ENV` is not set in the image.** The Next CLI derives it per command, and
-pinning it to `development` leaks into `next build`, where the prerender of
-`/_global-error` fails with a null React dispatcher.
+pinning it leaks into `next build`, where the prerender of `/_global-error`
+fails with a null React dispatcher.
 
 ## Testing
 
@@ -154,63 +167,84 @@ unit tests**, the production build, and a bundle-size gate that fails the build
 if initial JS exceeds its budget.
 
 **194 end-to-end tests** run across Chromium, WebKit and a dedicated
-reduced-motion project, including axe-core on every route with zero
+reduced-motion project, including axe-core on every route at zero
 serious/critical violations.
 
 What is tested is what has actually broken here, or what is invisible when
-wrong: the contrast ratios in the design spec (asserted against the shipped
-palette, so the table and the code cannot drift); the shader tuning constants
-(which put signal yellow across 14.6% of the viewport against a 4% cap before
-they were recalibrated); the CSP in all eight of its configurations; the audio
-band maths; and reduced-motion parity route by route.
+wrong: the contrast ratios from the design spec, asserted against the shipped
+palette; the shader tuning constants, which put the accent colour across 14.6%
+of the viewport against a 4% cap before recalibration; the CSP in all eight of
+its configurations; the audio band maths; and reduced-motion parity route by
+route.
 
 WebGL inside a container is software-rendered, which the capability probe
 correctly rejects — so containerised runs always exercise the fallback path and
-can never test the real hero. Frame-rate targets have to be measured on the
-host, against the containerised dev server.
+never the real hero. Frame-rate targets have to be measured on the host.
 
 ## Measured, not estimated
 
 | | Result | Budget |
 |---|---|---|
 | Initial client JS | 129.3 KB gz | 210 KB |
-| three.js chunk, lazy | 234.6 KB gz | 340 KB |
+| three.js chunk, lazy-loaded | 234.6 KB gz | 340 KB |
 | Fonts downloaded | 165.9 KB | 96 KB — **missed**, documented in the design spec |
-| Signal-colour viewport coverage | ≤ 3.85% at peak | 4% |
-| Sculpture GPU cost, 1280×720 | ~2.0 ms of a 16.67 ms frame | — |
+| Signal-colour viewport coverage | 3.85% at peak | 4% |
+| Sculpture GPU cost at 1280x720 | ~2.0 ms of a 16.67 ms frame | — |
 
 The font budget is the one miss. It assumed licensed static faces hand-subset to
 Latin; the free stand-ins are variable fonts carrying their whole design space.
-It is stated rather than quietly dropped.
+Stated rather than quietly dropped.
+
+## Three bugs worth reading about
+
+Every one of these passed the entire automated suite.
+
+**A `<span>` that killed every navigation.** GSAP's `SplitText` replaces a
+heading's text node with per-character spans. React still held references to the
+nodes it rendered, so unmounting the hero — every navigation away from home —
+threw `NotFoundError: Failed to execute 'removeChild'` and took the whole tree
+down with it. `useEffect` cleanup runs *after* React detaches a deleted subtree,
+so the revert arrived too late; `useLayoutEffect` runs before it.
+
+**A transform that broke a pin.** Animating `main` with `y` left a transform on
+it, and a transformed ancestor becomes the containing block for every
+`position: fixed` descendant — including ScrollTrigger's pin on the work rail,
+which then measured itself against `main` instead of the viewport and lost the
+whole section until it had scrolled past.
+
+**A wipe that could not cover its own swap.** A prefetched route swaps in tens of
+milliseconds while any cover worth watching takes hundreds, so the destination
+painted before the blades arrived. Delaying navigation fixed the flash and fought
+`next/link`, which navigates regardless of `preventDefault`. Covering *instantly*
+and sweeping away afterwards has neither problem.
 
 ## What I would do next
 
 1. **A custom domain, and a verified sender with it.** Until a domain is
-   verified in Resend, the form can only deliver to my own address — fine for a
-   demo, wrong for anything real.
-2. **Core Web Vitals and Lighthouse against real field data.** Never measured —
-   a persistent canvas and a 235 KB three.js chunk is exactly the shape that
+   verified in Resend, the form can only deliver to my own address.
+2. **Core Web Vitals and Lighthouse against real field data.** Never measured. A
+   persistent canvas and a 235 KB three.js chunk is exactly the shape that
    misses LCP or INP, and I would rather find out than assume.
-3. **Mobile GPUs.** The ≥ 30 fps half of the frame-rate target rests on them and
-   cannot be checked in a container.
+3. **Mobile GPUs.** The 30 fps floor rests on them and cannot be checked in a
+   container.
 4. **The pre-rendered fallback video.** The no-WebGL path is currently an honest
    CSS composition rather than the specified 8-second loop.
 5. **Screen-reader passes.** axe and the WCAG patterns are construction, not
    verification; NVDA and VoiceOver are manual and have not been done.
-6. **The `[locale]` route segment.** Copy is externalised and hreflang is
-   emitted; the segment itself is ceremony until a second language exists.
+6. **The Process page timeline.** Specified as a pinned horizontal scrub; built
+   as a vertical list.
 
 ## Specification
 
-Self-authored, in [docs/](docs/) — [01-PRD.md](docs/01-PRD.md),
-[02-UIUX-Design-Spec.md](docs/02-UIUX-Design-Spec.md) and
-[03-Roadmap-and-Plan.md](docs/03-Roadmap-and-Plan.md). Each carries a note on
-what in it is invented and what is measured, and the design spec carries the
-revision notes recording where its first draft was wrong — the contrast table,
-the shader constants, the geometry density, and a `ScrollTrigger.scrollerProxy`
-that was actively harmful. Those notes are the useful part.
+Self-authored, in [docs/](docs/) — [PRD](docs/01-PRD.md),
+[UI/UX spec](docs/02-UIUX-Design-Spec.md) and
+[roadmap](docs/03-Roadmap-and-Plan.md). Each carries a note on what in it is
+invented and what is measured, and the design spec carries revision notes
+recording where its first draft was wrong: the contrast table, the shader
+constants, the geometry density, and a `ScrollTrigger.scrollerProxy` that was
+actively harmful. Those notes are the useful part.
 
-The working agreement for coding agents is [AGENTS.md](AGENTS.md).
+Deployment runbook: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Licence
 
