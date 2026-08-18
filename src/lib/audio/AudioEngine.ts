@@ -206,6 +206,20 @@ class AudioEngine {
     return this.voices.has(id);
   }
 
+  /**
+   * `as` lets one buffer play under a second voice name.
+   *
+   * Voices are keyed by id and `play` stops whatever is already under that key,
+   * so two features auditioning the same file fight over one slot. The work
+   * rail and the mixing desk both play the case stems: the rail's audition was
+   * silently destroying the desk's channel, and stopping it on the way out left
+   * the visitor's mix gone and their faders driving voices that no longer
+   * existed — which reads as the desk going dead rather than as the rail having
+   * done anything.
+   *
+   * Naming the rail's voices separately lets both hold the same buffer without
+   * either owning it.
+   */
   play(
     id: string,
     {
@@ -214,13 +228,14 @@ class AudioEngine {
       fadeSeconds = 0,
       gain = 1,
       offsetSeconds = 0,
+      as = id,
     } = {},
   ): boolean {
     const ctx = this.ensure();
     const buffer = this.buffers.get(id);
     if (!ctx || !buffer || !this.buses) return false;
 
-    this.stop(id);
+    this.stop(as);
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -254,10 +269,10 @@ class AudioEngine {
 
     // A non-looping voice must unregister itself, or isPlaying lies forever.
     source.onended = () => {
-      if (this.voices.get(id)?.source === source) this.voices.delete(id);
+      if (this.voices.get(as)?.source === source) this.voices.delete(as);
     };
 
-    this.voices.set(id, { source, gain: voiceGain });
+    this.voices.set(as, { source, gain: voiceGain });
     return true;
   }
 

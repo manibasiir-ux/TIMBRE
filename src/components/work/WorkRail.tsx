@@ -70,6 +70,20 @@ const RAIL_SCRUB = 1.2;
  */
 const RAIL_STEM_GAIN = 0.7;
 
+/**
+ * The rail's own name for a stem voice.
+ *
+ * The mixing desk plays these same buffers as its client channels. Voices are
+ * keyed by name, so auditioning under the bare id evicted the desk's channel,
+ * and the visitor's mix vanished the moment they scrolled past the rail — their
+ * faders left driving voices that no longer existed. Prefixing keeps the two
+ * independent: the desk holds the buffer as a channel, the rail holds it as an
+ * audition, and neither stops the other.
+ */
+function railVoice(id: string): string {
+  return `rail:${id}`;
+}
+
 export function WorkRail() {
   const section = useRef<HTMLElement>(null);
   const track = useRef<HTMLUListElement>(null);
@@ -164,13 +178,14 @@ export function WorkRail() {
       // The outgoing stem is silenced and disowned in the same breath. Stopping
       // it while leaving the badge pointing at it would leave the previous card
       // lit with nothing playing if the incoming one then failed to start.
-      if (state.playing && state.playing !== asset.id) {
+      if (state.playing && state.playing !== railVoice(asset.id)) {
         audioEngine.stop(state.playing, 0.25);
         state.playing = null;
         setSounding(null);
       }
 
       const started = audioEngine.play(asset.id, {
+        as: railVoice(asset.id),
         bus: "sfx",
         fadeSeconds: 0.25,
         gain: RAIL_STEM_GAIN,
@@ -186,7 +201,7 @@ export function WorkRail() {
         audioEngine.duck();
         state.ducked = true;
       }
-      state.playing = asset.id;
+      state.playing = railVoice(asset.id);
       setSounding(slug);
     },
     [markStemUnavailable],

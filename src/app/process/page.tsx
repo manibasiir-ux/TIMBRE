@@ -86,7 +86,13 @@ export default function ProcessPage() {
               <p className="col-span-4 font-mono text-mono-xs text-signal lg:col-span-2">
                 {phase.number}
               </p>
-              <h2 className="col-span-4 font-display text-h2 text-ink lg:col-span-3">
+              {/* Four columns, not three, and the row now adds to twelve.
+                  At 2 + 3 + 6 the heading had about 360px at the reference
+                  width while "Guardianship" and "Development" set wider than
+                  that at text-h2's 52px ceiling — so they overflowed their
+                  track and ran underneath the description beside them. Display
+                  type does not wrap out of a collision; it just leaves. */}
+              <h2 className="col-span-4 font-display text-h2 text-balance text-ink lg:col-span-4">
                 {phase.name}
               </h2>
               <p className="col-span-4 max-w-[52ch] text-body text-ink-70 lg:col-span-6">
