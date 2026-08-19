@@ -217,36 +217,52 @@ because a single run of a lab test is a sample rather than a number.
 
 | | Mobile | Desktop |
 |---|---|---|
-| Performance | **93 – 95** | **99 – 100** |
+| Performance | **95** | **99 – 100** |
 | Accessibility | **100** | **100** |
 | Best Practices | **100** | **100** |
 | SEO | **100** | **100** |
 
 | Metric | Mobile | Desktop | Target |
 |---|---|---|---|
-| Largest Contentful Paint | 2.9 – 3.0 s | 0.6 s | ≤ 2.5 s mobile — **missed** · ≤ 2.0 s desktop — met |
+| Largest Contentful Paint | 2.9 s | 0.7 s | ≤ 2.5 s mobile — **missed** · ≤ 2.0 s desktop — met |
 | First Contentful Paint | 1.0 s | 0.3 s | — |
 | Cumulative Layout Shift | **0** | **0** | ≤ 0.05 |
-| Total Blocking Time | 50 – 140 ms | 90 ms | — |
-| Speed Index | 2.4 s | 0.9 s | — |
+| Total Blocking Time | **20 ms** | 90 ms | — |
+| Speed Index | 2.3 s | 0.9 s | — |
 
-**One target is missed and it is the interesting one.** Mobile LCP lands around
-2.9 – 3.0 s against a stated 2.5 s, on exactly the device profile the spec
-names. Desktop LCP is 0.6 s against a 2.0 s target, so the cost is specific to a
-throttled phone: Lighthouse points at roughly 70 – 90 ms of render-blocking
-requests and 225 KB of JavaScript that is downloaded and not used on first
-paint. A persistent WebGL canvas is precisely the shape that costs LCP, which is
-why the target was set before anything was built rather than after.
+**One target is missed and it is the interesting one** — though not for the
+reason I first wrote down here, and the wrong reason is worth keeping.
 
-The 225 KB is the three.js chunk, and tracing when it is fetched found it being
-downloaded *behind the consent gate* — an opaque full-screen wall over a canvas
-nobody can see until the gate is answered. The scene now waits for that answer.
-The table above is the measurement taken **before** that change; it stays as it
-is until a run against the deployed fix replaces it, because a table of numbers
-mixing two builds is worse than a table admitting it is out of date.
+The first diagnosis was that a persistent WebGL canvas is the shape that costs
+LCP. It reads well and it was wrong. Acting on it did produce a real
+improvement: the three.js chunk was being fetched immediately after hydration
+and *behind the consent gate*, an opaque full-screen wall over a canvas nobody
+can see until the gate is answered, and deferring it cut JavaScript downloaded
+but unused on first paint from 225 KB to 50 KB. Mobile LCP after that change:
+2.9 s. Exactly what it was before.
+
+So I opened the LCP breakdown instead of theorising, and it names the element:
+
+    main#main > section.shell > h1.relative > span.block
+
+That is the words "We make" — the first line of the hero lockup. Time to first
+byte 0 ms, **element render delay 800 ms**. Text, not canvas. The chunk was never
+in the LCP path, which is why moving it changed nothing.
+
+The element is also behind the gate. LCP does not account for one element being
+covered by another, so the metric is timing a piece of text that no visitor sees
+at the moment it is measured — the filmstrip is two blank frames and then the
+gate, all the way down. That is not an argument that the number is wrong. It is
+the reason the number is hard to move without changing something a visitor
+would notice, and the reason this stays a documented miss rather than a target
+chased until the metric relents.
+
+Reading that filmstrip carefully turned up something worth more than the metric.
+It is below, under the bugs.
 
 CLS is a flat zero on both, which is the number that usually suffers on a site
-with this much motion.
+with this much motion. Total Blocking Time is 20 ms, which is the number that
+would have suffered if the LCP problem had really been the canvas.
 
 Bundle and paint budgets, from the build's own gate:
 
@@ -271,7 +287,17 @@ guard acts on; the worst frame is what a 30 fps floor is actually about, since a
 mean of 58 containing one 90 ms frame is a stutter somebody felt. It is absent
 unless the URL asks for it, so a normal visit pays nothing for it.
 
-## Three bugs worth reading about
+It also says why it cannot read, rather than showing a "measuring" that never
+resolves — `fallback profile · no canvas`, `reduced motion · canvas idle`, `tab
+hidden · loop stopped`, or `stalling` with the raw slowest frame. The last of
+those exposes something the degrade guard cannot see: `FrameRateMonitor`
+discards its window on any frame over 250 ms, so that a single long frame cannot
+condemn a healthy machine — which means a machine slow enough to stall on every
+frame never completes a window, and never trips the guard that exists for it.
+The guard is right about the case it was written for. The readout covers the one
+it was not.
+
+## Four bugs worth reading about
 
 Every one of these passed the entire automated suite.
 
@@ -294,9 +320,30 @@ painted before the blades arrived. Delaying navigation fixed the flash and fough
 `next/link`, which navigates regardless of `preventDefault`. Covering *instantly*
 and sweeping away afterwards has neither problem.
 
+**An entrance animation nobody ever saw.** The hero lockup is split per character
+and staggered in over about two seconds — the most worked-on motion on the site.
+It ran from hydration, and the consent gate is `fixed inset-0` with an opaque
+background at z-9000. So it played behind a wall. Answer the gate in under two
+seconds and you caught the tail of it; take any longer and the hero was simply
+already there, settled, as though it had never moved.
+
+Nothing could catch this. It is not a rendering fault, an accessibility fault or
+a timing fault — every element was correct, visible and in the right place, and
+the animation ran exactly as written. It is two correct components with no
+knowledge of each other, and the only way to see it is to watch the thing load
+and notice an absence.
+
+What found it was a PageSpeed filmstrip, while I was chasing an unrelated number
+and looking at the frames for a different reason: two blank, then the gate, and
+the hero in not one of them. The intro now waits for the gate to be answered.
+Because that handover happens in a layout effect, the `from` state is applied in
+the same commit that unmounts the gate, so the lockup never flashes settled
+before dropping to its start position.
+
 ## Known gaps
 
-Named rather than left for someone to find. Two remain.
+Named rather than left for someone to find. Three remain, and the third
+replaced one I had prematurely written up as closed.
 
 1. **VoiceOver has not been run.** The hand pass covered NVDA on Windows. macOS
    and iOS are untested, and I do not have the hardware to test them honestly. A
@@ -305,18 +352,20 @@ Named rather than left for someone to find. Two remain.
 2. **No custom domain.** The site is on a `vercel.app` subdomain, which also
    means Resend will only deliver briefs to my own address. A portfolio piece
    does not need one; it is listed because the deployment is otherwise complete.
+3. **Mobile LCP is 2.9 s against a 2.5 s target.** Diagnosed rather than
+   guessed at this time: the element is the first line of the hero lockup, with
+   an 800 ms element render delay, and it sits behind the consent gate while it
+   is measured. Deferring the three.js chunk was the first attempt and did not
+   move it by a millisecond, which is written up under *Measured, not estimated*
+   because a wrong diagnosis that survived a whole fix is worth more than a
+   clean one. Every other metric passes, including a Total Blocking Time of
+   20 ms and a Cumulative Layout Shift of zero.
 
 ### Closed, with the evidence
 
 Kept visible rather than deleted, because how these were found is the more useful
 half.
 
-- **Mobile LCP.** Was 2.9 s against a 2.5 s target while desktop sat at 0.6 s,
-  which located the cost precisely: the three.js chunk was fetched immediately
-  after hydration, inside the LCP window, on a throttled phone. It was also being
-  fetched *behind the consent gate* — an opaque full-screen wall at z-9000 over a
-  canvas at z-0. Waiting for the gate to be answered is not a trick played on the
-  metric; it is declining to download something nobody can see.
 - **The `M` shortcut against WCAG 2.1.4.** A bare single-character shortcut has
   to be remappable, disableable, or scoped to a focused component. It is now
   scoped: `M` only reaches the page while focus is inside the transport bar.

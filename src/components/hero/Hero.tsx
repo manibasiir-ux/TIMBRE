@@ -10,6 +10,7 @@ import {
   resetSculptureMotion,
   sculptureMotion,
 } from "@/lib/motion/sculptureMotion";
+import { useExperience } from "@/store/useExperience";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
@@ -58,11 +59,33 @@ const useIsomorphicLayoutEffect =
  * The lockup is split per character and staggered at 0.04s. Under reduced motion
  * it is never split at all: SplitText rewrites the DOM into per-character spans,
  * which is noise for a screen reader and pointless when nothing will animate.
+ *
+ * ## Why it waits for the consent gate
+ *
+ * It used to run on hydration, which meant it ran behind the gate. The gate is
+ * `fixed inset-0` with an opaque background at z-9000; the intro is a little
+ * over two seconds long. Anyone who took longer than that to choose never saw
+ * it — they answered, the wall vanished, and the hero was simply already there.
+ * A PageSpeed filmstrip made it plain: two blank frames, then every remaining
+ * frame is the gate. The hero does not appear in a single one.
+ *
+ * Nothing here is expensive enough for the delay to matter, and the payoff is
+ * that the animation now plays for the person it was built for.
+ *
+ * `useLayoutEffect` is what makes the handover seamless. Answering the gate
+ * unmounts it and runs this in the same commit, before the browser paints, so
+ * the `from` starting state is already applied by the time anything is drawn.
+ * With `useEffect` the settled lockup would flash for one frame and then drop
+ * to its start position, which looks like a bug.
  */
 export function Hero() {
   const scope = useRef<HTMLElement>(null);
+  const consent = useExperience((state) => state.consent);
 
   useIsomorphicLayoutEffect(() => {
+    // Nothing is drawn until the visitor has answered. See above.
+    if (consent === "pending") return;
+
     const root = scope.current;
     if (!root) return;
 
@@ -181,7 +204,7 @@ export function Hero() {
       media?.revert();
       context.revert();
     };
-  }, []);
+  }, [consent]);
 
   return (
     <section

@@ -16,6 +16,7 @@ import { onTick } from "@/lib/motion/ticker";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import {
   FrameRateMonitor,
+  MIN_SAMPLES,
   PROFILE_SETTINGS,
   type RenderProfile,
   detectProfile,
@@ -147,9 +148,14 @@ function FrameRateReadout({
 }) {
   const monitor = useMemo(() => new FrameRateMonitor(), []);
   const sincePaint = useRef(0);
+  const frames = useRef(0);
+  const slowest = useRef(0);
 
   useFrame((_, delta) => {
     const deltaMs = delta * 1000;
+
+    frames.current += 1;
+    if (deltaMs > slowest.current) slowest.current = deltaMs;
     monitor.push(deltaMs);
 
     sincePaint.current += deltaMs;
@@ -157,11 +163,24 @@ function FrameRateReadout({
     sincePaint.current = 0;
 
     const reading = monitor.reading();
-    onSample(
-      reading
-        ? `${Math.round(reading.mean)} fps · worst ${Math.round(reading.worst)}`
-        : "measuring",
-    );
+    if (reading) {
+      onSample(
+        `${Math.round(reading.mean)} fps · worst ${Math.round(reading.worst)}`,
+      );
+    } else if (frames.current > MIN_SAMPLES) {
+      // The window has had every chance to fill and has not, which happens for
+      // exactly one reason: frames slower than the monitor's stall threshold,
+      // each of which discards the window on the way in. That guard exists so a
+      // single long frame cannot condemn a healthy machine, and the cost of it
+      // is that a genuinely unhealthy one never completes a window at all. The
+      // slowest frame since the last paint is the honest thing to show, and
+      // saying "measuring" for ever would be the dishonest one.
+      onSample(`~${Math.round(1000 / slowest.current)} fps · stalling`);
+    } else {
+      onSample("measuring");
+    }
+
+    slowest.current = 0;
   });
 
   return null;
@@ -213,7 +232,47 @@ export default function SceneRoot() {
     if (node) node.textContent = text;
   }, []);
 
-  if (profile === "fallback") return <HeroFallback />;
+  /**
+   * Why a reading might never start, said out loud.
+   *
+   * Each of these is a legitimate state in which no frames are drawn at all, so
+   * the readout has nothing to report and never will until the state changes. A
+   * badge that shows "measuring" indefinitely in all three cases is worse than
+   * no badge, because it reads as a broken instrument rather than as a canvas
+   * that is deliberately idle — which is what a reduced-motion phone is.
+   */
+  const frameRateNote =
+    profile === "fallback"
+      ? "fallback profile · no canvas"
+      : reducedMotion
+        ? "reduced motion · canvas idle"
+        : !documentVisible
+          ? "tab hidden · loop stopped"
+          : "measuring";
+
+  // Rendered outside the canvas container below, which sits at z-0 and would
+  // bury it under the page. Diagnostic rather than content, hence aria-hidden:
+  // a number ticking four times a second is nothing a screen reader should be
+  // made to read out.
+  const frameRateBadge = showFrameRate ? (
+    <p
+      ref={frameRateNode}
+      aria-hidden="true"
+      className="pointer-events-none fixed right-3 bottom-3 z-[9500] bg-ground/85 px-3 py-2 font-mono text-mono-xs text-signal tabular-nums"
+    >
+      {frameRateNote}
+    </p>
+  ) : null;
+
+  // The badge rides along, because "no canvas at all" is one of the answers the
+  // reading exists to give.
+  if (profile === "fallback")
+    return (
+      <>
+        <HeroFallback />
+        {frameRateBadge}
+      </>
+    );
 
   const settings = PROFILE_SETTINGS[profile];
 
@@ -275,19 +334,7 @@ export default function SceneRoot() {
         />
       </div>
 
-      {/* Outside the container above, which sits at z-0 and so would bury this
-          under the page. Diagnostic rather than content, hence aria-hidden: a
-          number ticking four times a second is nothing a screen reader should
-          be made to read out. */}
-      {showFrameRate && (
-        <p
-          ref={frameRateNode}
-          aria-hidden="true"
-          className="pointer-events-none fixed right-3 bottom-3 z-[9500] bg-ground/85 px-3 py-2 font-mono text-mono-xs text-signal tabular-nums"
-        >
-          measuring
-        </p>
-      )}
+      {frameRateBadge}
     </>
   );
 }
