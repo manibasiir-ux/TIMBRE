@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { visit } from "./support";
+import { visit, openDesk } from "./support";
 
 /**
  * The mixing desk, §8 and FR-08/FR-09.
@@ -17,7 +17,7 @@ test.describe("mixing desk", () => {
     const toggle = page.getByRole("button", { name: /mixing desk navigation/i });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-    await page.keyboard.press("m");
+    await openDesk(page);
     const desk = page.getByRole("dialog", { name: /mixing desk navigation/i });
     await expect(desk).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -30,7 +30,7 @@ test.describe("mixing desk", () => {
   test("returns focus to the toggle on close", async ({ page }) => {
     await visit(page, "/");
 
-    await page.keyboard.press("m");
+    await openDesk(page);
     await expect(
       page.getByRole("dialog", { name: /mixing desk navigation/i }),
     ).toBeVisible();
@@ -47,7 +47,7 @@ test.describe("mixing desk", () => {
     page,
   }) => {
     await visit(page, "/");
-    await page.keyboard.press("m");
+    await openDesk(page);
 
     const desk = page.getByRole("dialog", { name: /mixing desk navigation/i });
     const sliders = desk.getByRole("slider");
@@ -64,7 +64,7 @@ test.describe("mixing desk", () => {
 
   test("gives every fader a value text, not a bare number", async ({ page }) => {
     await visit(page, "/");
-    await page.keyboard.press("m");
+    await openDesk(page);
 
     const sliders = page
       .getByRole("dialog", { name: /mixing desk navigation/i })
@@ -80,7 +80,7 @@ test.describe("mixing desk", () => {
 
   test("moves focus between channels with the arrow keys", async ({ page }) => {
     await visit(page, "/");
-    await page.keyboard.press("m");
+    await openDesk(page);
 
     const desk = page.getByRole("dialog", { name: /mixing desk navigation/i });
     await expect(desk.getByRole("slider").first()).toBeFocused();
@@ -94,7 +94,7 @@ test.describe("mixing desk", () => {
 
   test("never offers a channel that goes nowhere", async ({ page }) => {
     await visit(page, "/");
-    await page.keyboard.press("m");
+    await openDesk(page);
 
     const nav = page.getByRole("navigation", { name: /sections/i });
 
@@ -122,7 +122,7 @@ test.describe("mixing desk", () => {
       (window as unknown as { __persisted?: boolean }).__persisted = true;
     });
 
-    await page.keyboard.press("m");
+    await openDesk(page);
     // Navigation moved from a Go link on each strip to the section row beneath
     // the mixer, so this now clicks the section by name.
     await page

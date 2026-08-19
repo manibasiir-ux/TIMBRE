@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { ROUTES, visit } from "./support";
+import { ROUTES, visit, openDesk } from "./support";
 
 /**
  * Content-Security-Policy, NFR-12.
@@ -90,7 +90,7 @@ test.describe("content security policy", () => {
     // The two things a broken script-src takes out first, and the two least
     // obvious from a screenshot.
     await visit(page, "/");
-    await page.keyboard.press("m");
+    await openDesk(page);
     await expect(
       page.getByRole("dialog", { name: /mixing desk navigation/i }),
     ).toBeVisible();

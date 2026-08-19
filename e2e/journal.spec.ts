@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { visit } from "./support";
+import { visit, openDesk } from "./support";
 
 /**
  * The journal, §6.7 and FR-19.
@@ -81,7 +81,7 @@ test.describe("journal", () => {
 
   test("is reachable from the mixing desk", async ({ page }) => {
     await visit(page, "/");
-    await page.keyboard.press("m");
+    await openDesk(page);
 
     // It shipped disabled for months. Being reachable from the desk is the
     // whole point of building the route.

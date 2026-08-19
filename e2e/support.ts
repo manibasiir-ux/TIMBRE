@@ -46,3 +46,18 @@ export async function visit(page: Page, path: string): Promise<void> {
   await page.goto(path);
   await answerConsent(page);
 }
+
+/**
+ * Opens the mixing desk with its keyboard shortcut.
+ *
+ * The shortcut is scoped to focus, per WCAG 2.1.4 — a bare single-character
+ * shortcut listening on the document is neither remappable, switchable off, nor
+ * focus-scoped, and a screen reader claims those keys for its own navigation
+ * anyway. So reaching the control comes first, exactly as a visitor would.
+ */
+export async function openDesk(page: Page): Promise<void> {
+  await page
+    .getByRole("button", { name: /mixing desk navigation/i })
+    .focus();
+  await page.keyboard.press("m");
+}

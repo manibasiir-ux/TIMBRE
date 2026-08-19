@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-import { ROUTES, answerConsent, visit } from "./support";
+import { ROUTES, answerConsent, visit, openDesk } from "./support";
 
 /**
  * Accessibility, NFR-16 and the M7 gate: zero serious or critical issues.
@@ -64,7 +64,7 @@ test.describe("accessibility", () => {
 
   test("the open mixing desk is clean", async ({ page }) => {
     await visit(page, "/");
-    await page.keyboard.press("m");
+    await openDesk(page);
     await expect(
       page.getByRole("dialog", { name: /mixing desk navigation/i }),
     ).toBeVisible();

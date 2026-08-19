@@ -55,6 +55,8 @@ export function SiteControls() {
   const audible = useExperience(selectAudible);
 
   const deskToggle = useRef<HTMLButtonElement>(null);
+  /** The shortcut is scoped to focus inside this, per WCAG 2.1.4. */
+  const bar = useRef<HTMLDivElement>(null);
   const audibleSeconds = useRef(0);
   const reelMilestone = useRef(false);
 
@@ -112,7 +114,24 @@ export function SiteControls() {
     return () => window.clearInterval(id);
   }, [audible]);
 
-  // §8 and §10: M toggles the desk, Shift+M toggles sound.
+  /**
+   * §8 and §10: M toggles the desk, Shift+M toggles sound — but only while one
+   * of these controls has focus.
+   *
+   * It used to listen on the whole document. WCAG 2.1.4 asks that a shortcut
+   * made of a single character be remappable, switchable off, or active only
+   * while its component has focus, and a global listener is none of those. The
+   * practical version of the same problem: a screen reader claims single letters
+   * for its own navigation, so under NVDA pressing M moved to the next frame and
+   * the page never saw the key. The shortcut worked for sighted keyboard users
+   * and silently did nothing for everyone else — found by running NVDA, not by
+   * any automated check.
+   *
+   * Scoped to focus it satisfies the third route, and it now behaves the way a
+   * shortcut on a control should: reach the control, then the letter works.
+   * Everyone else reaches the desk the same way they always could, by
+   * activating this button.
+   */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "m" || event.metaKey || event.ctrlKey) {
@@ -126,6 +145,8 @@ export function SiteControls() {
       ) {
         return;
       }
+      // Active only on focus, per SC 2.1.4.
+      if (!target || !bar.current?.contains(target)) return;
       event.preventDefault();
       if (event.shiftKey) toggleMute();
       else toggleDesk();
@@ -148,6 +169,7 @@ export function SiteControls() {
         Square, not rounded. Every edge on this site is square.
       */}
       <div
+        ref={bar}
         data-site-controls
         className="fixed top-0 right-0 z-[8500] flex items-center border-b border-l border-ink-15 bg-ground/80 backdrop-blur-md"
         style={{
