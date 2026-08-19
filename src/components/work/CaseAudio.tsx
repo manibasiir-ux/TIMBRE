@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { track } from "@/lib/analytics";
 import { audioEngine } from "@/lib/audio/AudioEngine";
+import { createDuckHandle } from "@/lib/audio/duckHandle";
+import { caseVoice } from "@/lib/audio/voices";
 import { stemForCase } from "@/lib/audio/manifest";
 import type { ContextPlayer, InventoryItem } from "@/content/cases";
 import { useExperience } from "@/store/useExperience";
@@ -51,6 +53,22 @@ export function CaseAudio({
   const missing = asset ? unavailable.includes(asset.id) : true;
   const inventoryRef = useRef<HTMLElement>(null);
   const deepLinked = useRef(false);
+  const duck = useRef(createDuckHandle());
+  /**
+   * Whether this case study is still on screen.
+   *
+   * Loading a stem is slow enough on a first visit to outlast the page: a route
+   * change during the await would run the cleanup below — which has nothing to
+   * clean up yet — and then start the audio anyway, over whatever came next,
+   * holding a duck nobody will release.
+   */
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   // Tells the sculpture and its accessible name which case is on screen, and
   // hands both back on the way out so the next route does not inherit them.
@@ -61,8 +79,8 @@ export function CaseAudio({
 
   useEffect(
     () => () => {
-      if (asset) audioEngine.stop(asset.id, 0.3);
-      audioEngine.releaseDuck();
+      if (asset) audioEngine.stop(caseVoice(asset.id), 0.3);
+      duck.current.release();
     },
     [asset],
   );
@@ -96,10 +114,12 @@ export function CaseAudio({
         markUnavailable(asset.id);
         return;
       }
+      if (!alive.current) return;
 
       inventoryRef.current?.scrollIntoView({ block: "start" });
-      audioEngine.duck();
+      duck.current.take();
       audioEngine.play(asset.id, {
+        as: caseVoice(asset.id),
         bus: "sfx",
         fadeSeconds: 0.2,
         offsetSeconds: seconds,
@@ -112,8 +132,8 @@ export function CaseAudio({
     if (!asset || consent !== "granted") return;
 
     if (active === id) {
-      audioEngine.stop(asset.id, 0.3);
-      audioEngine.releaseDuck();
+      audioEngine.stop(caseVoice(asset.id), 0.3);
+      duck.current.release();
       setActive(null);
       return;
     }
@@ -124,10 +144,15 @@ export function CaseAudio({
       markUnavailable(asset.id);
       return;
     }
+    if (!alive.current) return;
 
-    // FR-12: the bed ducks 12dB while a contextual player is active.
-    audioEngine.duck();
-    audioEngine.play(asset.id, { bus: "sfx", fadeSeconds: 0.2 });
+    // FR-12: the bed ducks 12dB while a contextual player is active. One duck
+    // covers the player, not each item in it — switching from one inventory
+    // entry to another used to take a second duck without releasing the first,
+    // so working down the list left the bed pinned down for the session.
+    duck.current.take();
+    // Scoped, so the desk's channel for this same buffer survives. See voices.ts.
+    audioEngine.play(asset.id, { as: caseVoice(asset.id), bus: "sfx", fadeSeconds: 0.2 });
     setActive(id);
     // NFR-14. Whether anyone actually plays the work is the single most
     // useful thing this site can measure about itself.

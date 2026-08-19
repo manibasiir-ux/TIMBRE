@@ -242,7 +242,13 @@ class AudioEngine {
     source.loop = loop;
 
     const voiceGain = ctx.createGain();
-    const target = this.muted ? 0 : gain;
+    // Mute is not applied here. It lives on the master gain, which is the only
+    // node that has to be undone to restore sound. Baking it into a voice too
+    // made it one-way: `setMuted` ramps the master back to 1 and nothing ever
+    // lifts a voice that was zeroed on the way in, so anything started or
+    // adjusted while muted stayed silent for the rest of the session with its
+    // fader still reading full.
+    const target = gain;
 
     if (fadeSeconds > 0) {
       voiceGain.gain.setValueAtTime(0, ctx.currentTime);
@@ -343,7 +349,9 @@ class AudioEngine {
     const ctx = this.ctx;
     if (!voice || !ctx) return false;
 
-    const target = this.muted ? 0 : Math.max(0, Math.min(1, value));
+    // Not gated on mute, for the reason given in `play`: the master is the one
+    // place mute is applied, so a fader always writes the value it shows.
+    const target = Math.max(0, Math.min(1, value));
     const now = ctx.currentTime;
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
@@ -362,7 +370,16 @@ class AudioEngine {
    * the others happened to be at.
    */
   ensureVoice(id: string, gain: number, bus: AudioBus = "bed"): boolean {
-    if (this.voices.has(id)) return true;
+    // An existing voice is brought to the asked-for level rather than left
+    // wherever it happened to be. The bed is the case that needs this: the
+    // sound toggle starts it at full when consent is granted, so by the time
+    // the desk engages, channel 01 already exists at a gain the Room fader
+    // never chose. Returning early on `has` alone left the fader and the sound
+    // disagreeing from the first frame.
+    if (this.voices.has(id)) {
+      this.setVoiceGain(id, gain);
+      return true;
+    }
     return this.play(id, { loop: true, bus, gain });
   }
 

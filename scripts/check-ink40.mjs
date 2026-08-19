@@ -46,7 +46,13 @@ for (const path of walk(ROOT)) {
     // Comments are stripped before matching. Naming the token while explaining
     // why something avoids it is not a use of it, and a checker that cannot
     // tell the difference pushes people towards writing less about the rule.
-    let code = line;
+    // A trailing CR, from a CRLF working tree on Windows, is stripped first.
+    // JavaScript counts CR as a line terminator, so `.` will not cross one and
+    // the `//` strip below cannot reach the end of the string to match — every
+    // line comment then reads as code. The symptom is this checker reporting a
+    // violation whose only occurrence is the sentence explaining why the token
+    // is avoided, which is a confusing way to spend twenty minutes.
+    let code = line.replace(/\r$/, "");
     if (inBlockComment) {
       const close = code.indexOf("*/");
       if (close === -1) return;

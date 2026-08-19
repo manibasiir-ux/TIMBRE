@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 import { audioEngine } from "@/lib/audio/AudioEngine";
+import { createDuckHandle } from "@/lib/audio/duckHandle";
+import { previewVoice } from "@/lib/audio/voices";
 import {
   CASES,
   type Sector,
@@ -50,6 +52,19 @@ export function WorkIndex() {
 
   const [previewing, setPreviewing] = useState<string | null>(null);
   const previewTimer = useRef<number | null>(null);
+  const duck = useRef(createDuckHandle());
+  /**
+   * What the pointer is on, and what is actually sounding.
+   *
+   * `wanted` is written before the buffer is awaited and cleared when the
+   * pointer leaves, so a load that resolves after the visitor has moved on can
+   * tell that nobody is waiting for it any more. `voice` is what to silence,
+   * which unmount needs and cannot work out from a slug it no longer has.
+   */
+  const preview = useRef<{ wanted: string | null; voice: string | null }>({
+    wanted: null,
+    voice: null,
+  });
 
   const consent = useExperience((state) => state.consent);
   const muted = useExperience((state) => state.muted);
@@ -70,9 +85,16 @@ export function WorkIndex() {
       window.clearTimeout(previewTimer.current);
       previewTimer.current = null;
     }
+    preview.current.wanted = null;
     const entry = CASES.find((item) => item.slug === slug);
     const asset = entry ? stemFor(entry) : null;
-    if (asset) audioEngine.stop(asset.id, 0.3);
+    if (asset) audioEngine.stop(previewVoice(asset.id), 0.3);
+    preview.current.voice = null;
+    // The duck is released here as well as on the timer. Leaving a card before
+    // the preview ran out used to clear the timeout and skip the release, so
+    // every early pointer-leave leaked one — and the bed those ducks hold down
+    // is the desk's own bus.
+    duck.current.release();
     setPreviewing((current) => (current === slug ? null : current));
   }, []);
 
@@ -83,20 +105,33 @@ export function WorkIndex() {
       const asset = entry ? stemFor(entry) : null;
       if (!asset) return;
 
+      preview.current.wanted = slug;
       const buffer = await audioEngine.load(asset.id, asset.url);
       if (!buffer) return;
 
-      audioEngine.duck();
+      // The first load of a stem is long enough for the pointer to leave the
+      // card, and starting anyway would sound a preview over a card nobody is
+      // on — with a duck held for it that only the timer would release.
+      if (preview.current.wanted !== slug || !canPreview) return;
+
+      duck.current.take();
+      // Under a scoped name: the desk holds this same buffer as a channel, and
+      // playing it under the bare id would evict the channel and leave its
+      // fader driving a voice that no longer exists. See voices.ts.
       audioEngine.play(asset.id, {
+        as: previewVoice(asset.id),
         bus: "sfx",
         fadeSeconds: 0.25,
         gain: PREVIEW_GAIN,
       });
+      preview.current.voice = previewVoice(asset.id);
       setPreviewing(slug);
 
       previewTimer.current = window.setTimeout(() => {
-        audioEngine.stop(asset.id, 0.4);
-        audioEngine.releaseDuck();
+        previewTimer.current = null;
+        audioEngine.stop(previewVoice(asset.id), 0.4);
+        preview.current.voice = null;
+        duck.current.release();
         setPreviewing(null);
       }, PREVIEW_SECONDS * 1000);
     },
@@ -109,7 +144,11 @@ export function WorkIndex() {
   useEffect(
     () => () => {
       if (previewTimer.current) window.clearTimeout(previewTimer.current);
-      audioEngine.releaseDuck();
+      // The comment above promised this and did not do it: clearing the timer
+      // cancelled the stop as well as the release, so a route change mid-hover
+      // carried the preview onto the next page.
+      if (preview.current.voice) audioEngine.stop(preview.current.voice, 0.3);
+      duck.current.release();
     },
     [],
   );

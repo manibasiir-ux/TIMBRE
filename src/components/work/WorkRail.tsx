@@ -14,6 +14,8 @@ import {
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 import { CASES, stemFor } from "@/content/cases";
 import { audioEngine } from "@/lib/audio/AudioEngine";
+import { createDuckHandle } from "@/lib/audio/duckHandle";
+import { railVoice } from "@/lib/audio/voices";
 import {
   MORPH_SECONDS,
   NEUTRAL_IDENTITY,
@@ -70,20 +72,6 @@ const RAIL_SCRUB = 1.2;
  */
 const RAIL_STEM_GAIN = 0.7;
 
-/**
- * The rail's own name for a stem voice.
- *
- * The mixing desk plays these same buffers as its client channels. Voices are
- * keyed by name, so auditioning under the bare id evicted the desk's channel,
- * and the visitor's mix vanished the moment they scrolled past the rail — their
- * faders left driving voices that no longer existed. Prefixing keeps the two
- * independent: the desk holds the buffer as a channel, the rail holds it as an
- * audition, and neither stops the other.
- */
-function railVoice(id: string): string {
-  return `rail:${id}`;
-}
-
 export function WorkRail() {
   const section = useRef<HTMLElement>(null);
   const track = useRef<HTMLUListElement>(null);
@@ -113,19 +101,17 @@ export function WorkRail() {
    * created once and would otherwise read whatever `canPlay` was at mount
    * forever — which is how a muted visitor ends up hearing something.
    *
-   * `ducked` is a boolean and not a counter on purpose. The engine's duck is
-   * reference-counted, so an unmatched duck leaves the bed quiet for the rest
-   * of the session with nothing on screen to explain it. One duck is taken when
-   * the rail starts playing and released when it stops, whatever happens to the
-   * cards in between.
+   * The duck is held through a `DuckHandle`, which takes at most one and
+   * releases only what it took. The engine's duck is reference-counted, so an
+   * unmatched one leaves the bed quiet for the rest of the session with nothing
+   * on screen to explain it. One duck is taken when the rail starts playing and
+   * released when it stops, whatever happens to the cards in between.
    */
   const [sounding, setSounding] = useState<string | null>(null);
   const canPlayRef = useRef(canPlay);
   const wantedSlug = useRef<string | null>(null);
-  const voice = useRef<{ playing: string | null; ducked: boolean }>({
-    playing: null,
-    ducked: false,
-  });
+  const voice = useRef<{ playing: string | null }>({ playing: null });
+  const duck = useRef(createDuckHandle());
 
   /**
    * Silences the rail. Touches the engine and refs only, never state.
@@ -142,10 +128,7 @@ export function WorkRail() {
       audioEngine.stop(state.playing, 0.35);
       state.playing = null;
     }
-    if (state.ducked) {
-      audioEngine.releaseDuck();
-      state.ducked = false;
-    }
+    duck.current.release();
   }, []);
 
   /** Silences the rail from an event callback, where clearing state is safe. */
@@ -197,10 +180,7 @@ export function WorkRail() {
       // nobody can hear — the one thing this section cannot get wrong.
       if (!started) return;
 
-      if (!state.ducked) {
-        audioEngine.duck();
-        state.ducked = true;
-      }
+      duck.current.take();
       state.playing = railVoice(asset.id);
       setSounding(slug);
     },
