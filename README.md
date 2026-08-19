@@ -361,33 +361,6 @@ replaced one I had prematurely written up as closed.
    clean one. Every other metric passes, including a Total Blocking Time of
    20 ms and a Cumulative Layout Shift of zero.
 
-### Closed, with the evidence
-
-Kept visible rather than deleted, because how these were found is the more useful
-half.
-
-- **The `M` shortcut against WCAG 2.1.4.** A bare single-character shortcut has
-  to be remappable, disableable, or scoped to a focused component. It is now
-  scoped: `M` only reaches the page while focus is inside the transport bar.
-- **Heading navigation.** A real defect, not the unverified pass it was first
-  written up as. See the screen-reader section above.
-- **Frame rate on mobile.** Instrumented rather than asserted — `?fps=1` prints
-  the rolling mean and the worst frame in the window.
-- **The fallback video.** NFR-08 specifies an 8-second pre-rendered loop for
-  machines without WebGL; what ships is a static CSS composition. Closed as a
-  **revision to the spec rather than a thing built**, with the reasoning written
-  into [the PRD](docs/01-PRD.md) beside the clause it overrides: every route into
-  that profile — no WebGL2, under 4 GB of memory, a software rasteriser — is a
-  description of a slow machine, and the spec's answer was to hand that machine
-  1.3 MB of video on the LCP path so it could watch an imitation of the effect it
-  had just been found incapable of running. What is genuinely lost is that the
-  fallback no longer moves. That is the smaller cost.
-- **The Process page.** §6.6 specifies a pinned five-phase horizontal scrub with
-  a signal playhead, and it had shipped as a vertical list. Now built. The
-  vertical list is still the base markup, promoted to a horizontal track only at
-  `lg` and only under `prefers-reduced-motion: no-preference`, so the simple
-  version is the default rather than something reconstructed when an effect
-  declines to run.
 
 ## Specification
 
