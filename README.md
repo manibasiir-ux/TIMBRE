@@ -177,23 +177,70 @@ of the viewport against a 4% cap before recalibration; the CSP in all eight of
 its configurations; the audio band maths; and reduced-motion parity route by
 route.
 
+A screen-reader pass was run by hand with **NVDA on Windows**, because
+Accessibility 100 and zero axe violations are machine checks and a machine
+cannot tell you whether an interface makes sense to someone who cannot see it.
+
+It found one real defect. Pressing Continue on an invalid step set the field
+errors, shook the form and announced **nothing** — every error was rendered and
+correctly tied to its input with `aria-describedby`, which is only spoken when
+that input takes focus, and focus stayed on the button. Sighted visitors saw red
+text; a screen-reader user got silence. No automated check could have caught it,
+because the markup was right and the behaviour was wrong. Fixed by announcing the
+failure count in a live region and moving focus to the first failing field, then
+re-tested by ear.
+
+What passed unchanged: the consent gate, the skip link as first focusable
+element, and — the one I expected to fail — route changes, which announce the
+new heading rather than swapping content in silence.
+
 WebGL inside a container is software-rendered, which the capability probe
 correctly rejects — so containerised runs always exercise the fallback path and
 never the real hero. Frame-rate targets have to be measured on the host.
 
 ## Measured, not estimated
 
+Lighthouse, run through PageSpeed Insights against the live deployment — an
+emulated Moto G Power on Slow 4G for mobile.
+
+| | Mobile | Desktop |
+|---|---|---|
+| Performance | **95** | **100** |
+| Accessibility | **100** | **100** |
+| Best Practices | **100** | **100** |
+| SEO | **91** | **100** |
+
+| Metric | Mobile | Target |
+|---|---|---|
+| Largest Contentful Paint | 2.9 s | ≤ 2.5 s — **missed** |
+| First Contentful Paint | 1.0 s | — |
+| Cumulative Layout Shift | **0** | ≤ 0.05 |
+| Total Blocking Time | 50 ms | — |
+| Speed Index | 2.4 s | — |
+
+**Two of these miss the spec, and both are worth stating.** LCP is 2.9 s against
+a stated 2.5 s on exactly the device profile the spec names, and mobile SEO is
+91 against a stated 100. Neither is fatal and both are real: a persistent WebGL
+canvas is precisely the shape that costs LCP, which is why the target was set
+before anything was built rather than after.
+
+Bundle and paint budgets, from the build's own gate:
+
 | | Result | Budget |
 |---|---|---|
 | Initial client JS | 129.3 KB gz | 210 KB |
 | three.js chunk, lazy-loaded | 234.6 KB gz | 340 KB |
-| Fonts downloaded | 165.9 KB | 96 KB — **missed**, documented in the design spec |
+| Fonts downloaded | 165.9 KB | 96 KB — **missed** |
 | Signal-colour viewport coverage | 3.85% at peak | 4% |
 | Sculpture GPU cost at 1280x720 | ~2.0 ms of a 16.67 ms frame | — |
 
-The font budget is the one miss. It assumed licensed static faces hand-subset to
-Latin; the free stand-ins are variable fonts carrying their whole design space.
-Stated rather than quietly dropped.
+The font budget assumed licensed static faces hand-subset to Latin; the free
+stand-ins are variable fonts carrying their whole design space. Stated rather
+than quietly dropped.
+
+Real-device check: the site was exercised by hand on a phone — the sculpture
+renders, scrolling holds up, and the desk's faders drag under touch. Frame rate
+was not instrumented, so no fps figure is claimed.
 
 ## Three bugs worth reading about
 
@@ -218,21 +265,33 @@ painted before the blades arrived. Delaying navigation fixed the flash and fough
 `next/link`, which navigates regardless of `preventDefault`. Covering *instantly*
 and sweeping away afterwards has neither problem.
 
-## What I would do next
+## Known gaps
 
-1. **A custom domain, and a verified sender with it.** Until a domain is
-   verified in Resend, the form can only deliver to my own address.
-2. **Core Web Vitals and Lighthouse against real field data.** Never measured. A
-   persistent canvas and a 235 KB three.js chunk is exactly the shape that
-   misses LCP or INP, and I would rather find out than assume.
-3. **Mobile GPUs.** The 30 fps floor rests on them and cannot be checked in a
-   container.
-4. **The pre-rendered fallback video.** The no-WebGL path is currently an honest
-   CSS composition rather than the specified 8-second loop.
-5. **Screen-reader passes.** axe and the WCAG patterns are construction, not
-   verification; NVDA and VoiceOver are manual and have not been done.
-6. **The Process page timeline.** Specified as a pinned horizontal scrub; built
-   as a vertical list.
+Named rather than left for someone to find.
+
+1. **LCP is 2.9 s on mobile against a 2.5 s target.** A persistent WebGL canvas
+   is the likely cost. The lever is the render-blocking chain Lighthouse flags —
+   about 90 ms of it — and the 47 KB of unused JavaScript on first load.
+2. **Mobile SEO scores 91 against a stated 100.** Desktop is 100, so it is a
+   mobile-specific audit rather than a content problem.
+3. **The `M` shortcut is unusable under a screen reader.** NVDA's browse mode
+   claims single letters for its own navigation, so `M` never reaches the page.
+   That also puts it against WCAG 2.1.4, which requires a single-character
+   shortcut to be remappable, disableable, or scoped to a focused component.
+   The desk is still reachable by its button; the shortcut is a convenience that
+   only works for sighted keyboard users.
+4. **Heading navigation is unverified.** One NVDA pass reported no headings from
+   its starting position, which may have been browse-mode state rather than the
+   document. Not retested, so not claimed either way.
+5. **VoiceOver has not been run.** The NVDA pass covered Windows only.
+6. **No frame-rate instrumentation on mobile.** The site was checked by hand on
+   a real phone and behaves, but the 30 fps floor in the spec is unverified.
+7. **The pre-rendered fallback video does not exist.** The no-WebGL path is an
+   honest CSS composition rather than the specified 8-second loop.
+8. **The Process page** is specified as a pinned horizontal scrub and built as a
+   vertical list.
+9. **A custom domain**, which would also let Resend deliver to addresses other
+   than my own.
 
 ## Specification
 

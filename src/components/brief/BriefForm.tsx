@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { track } from "@/lib/analytics";
 import { audioEngine } from "@/lib/audio/AudioEngine";
+import { focusAfterCommit } from "@/lib/focusAfterCommit";
 import { CONFIRM_MNEMONIC } from "@/lib/audio/manifest";
 import {
   BUDGET_BANDS,
@@ -119,6 +120,7 @@ export function BriefForm() {
 
   const consent = useExperience((state) => state.consent);
   const headingRef = useRef<HTMLParagraphElement>(null);
+  const [stepNotice, setStepNotice] = useState("");
 
   useEffect(() => {
     if (reference) return;
@@ -139,6 +141,41 @@ export function BriefForm() {
     window.setTimeout(() => setShake(false), 320);
   };
 
+  /**
+   * Where focus should land for a field that failed validation.
+   *
+   * Most fields are inputs and are found by id. Services is a group of toggle
+   * buttons and budget a set of visually-hidden radios, so neither has an input
+   * carrying its own name — those carry `data-error-anchor` instead.
+   */
+  const errorAnchor = (key: string): HTMLElement | null =>
+    document.getElementById(key) ??
+    document.querySelector<HTMLElement>(`[data-error-anchor="${key}"]`);
+
+  /**
+   * A failed step has to be announced, not just shown.
+   *
+   * Invalid input used to set the field errors, shake the form and stop. Every
+   * error was rendered and correctly tied to its input with `aria-describedby`
+   * — which is only spoken when that input takes focus, and focus stayed on the
+   * Continue button. So a sighted visitor saw red text and a shake, and a
+   * screen-reader user got silence. Found by running NVDA over it; no automated
+   * check caught it, because the markup was right and the behaviour was wrong.
+   *
+   * Focus moves to the first field that failed, which announces its label and
+   * its error together, and the count goes into a live region so the shape of
+   * the problem arrives before the detail.
+   */
+  const announceStepErrors = (keys: string[]) => {
+    if (keys.length === 0) return;
+    setStepNotice(
+      keys.length === 1
+        ? "One field needs attention."
+        : `${keys.length} fields need attention.`,
+    );
+    focusAfterCommit(() => errorAnchor(keys[0]));
+  };
+
   const advance = () => {
     const schema = STEPS[step].schema;
     if (schema) {
@@ -151,9 +188,11 @@ export function BriefForm() {
           ),
         );
         rejectStep();
+        announceStepErrors(Object.keys(fieldErrors));
         return;
       }
     }
+    setStepNotice("");
     setErrors({});
     // NFR-14, and the most valuable number the form produces: which step people
     // abandon. A single completion rate cannot tell you where it went wrong.
@@ -269,6 +308,14 @@ export function BriefForm() {
         >
           {current.title}
         </p>
+
+        {/* The count of failing fields, spoken before focus lands on the first
+            of them. Assertive because it is the direct answer to the visitor
+            having just pressed Continue, and it is visually hidden because the
+            errors themselves are already shown beside their fields. */}
+        <p aria-live="assertive" className="sr-only">
+          {stepNotice}
+        </p>
         <p className="font-mono text-mono-xs text-ink-70 tabular-nums">
           Step {String(step + 1).padStart(2, "0")} /{" "}
           {String(STEPS.length).padStart(2, "0")}
@@ -311,12 +358,14 @@ export function BriefForm() {
                 What do you need?
               </legend>
               <ul className="mt-6 flex flex-wrap gap-2">
-                {SERVICE_LINES.map((line) => {
+                {SERVICE_LINES.map((line, index) => {
                   const selected = (values.services ?? []).includes(line);
                   return (
                     <li key={line}>
                       <button
                         type="button"
+                        // The focus target when this group fails validation.
+                        data-error-anchor={index === 0 ? "services" : undefined}
                         onClick={() => toggleService(line)}
                         aria-pressed={selected}
                         className={`min-h-11 border px-4 py-2 font-mono text-mono-xs transition-colors duration-[var(--dur-quick)] ${
@@ -390,6 +439,9 @@ export function BriefForm() {
                       <input
                         type="radio"
                         name="budget"
+                        data-error-anchor={
+                          band.value === BUDGET_BANDS[0].value ? "budget" : undefined
+                        }
                         value={band.value}
                         checked={selected}
                         onChange={() => {
