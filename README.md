@@ -181,18 +181,29 @@ A screen-reader pass was run by hand with **NVDA on Windows**, because
 Accessibility 100 and zero axe violations are machine checks and a machine
 cannot tell you whether an interface makes sense to someone who cannot see it.
 
-It found one real defect. Pressing Continue on an invalid step set the field
-errors, shook the form and announced **nothing** — every error was rendered and
-correctly tied to its input with `aria-describedby`, which is only spoken when
-that input takes focus, and focus stayed on the button. Sighted visitors saw red
-text; a screen-reader user got silence. No automated check could have caught it,
-because the markup was right and the behaviour was wrong. Fixed by announcing the
-failure count in a live region and moving focus to the first failing field, then
-re-tested by ear.
+It found two real defects, and neither was visible to any automated tool.
 
-What passed unchanged: the consent gate, the skip link as first focusable
-element, and — the one I expected to fail — route changes, which announce the
-new heading rather than swapping content in silence.
+Pressing Continue on an invalid step set the field errors, shook the form and
+announced **nothing** — every error was rendered and correctly tied to its input
+with `aria-describedby`, which is only spoken when that input takes focus, and
+focus stayed on the button. Sighted visitors saw red text; a screen-reader user
+got silence. Fixed by announcing the failure count in a live region and moving
+focus to the first failing field, then re-tested by ear.
+
+The second was heading navigation. Pressing `H` on a first visit answered **no
+next heading** on a homepage that has six. The headings were all there and all
+correctly named; the consent gate in front of them carried `aria-modal="true"`,
+which confines a screen reader's virtual buffer to the dialog, and the dialog's
+title was set as a `<p>`. So the buffer really did contain no headings — the
+answer was correct and the markup was the lie. One element changed from `<p>` to
+`<h2>`.
+
+Both have the shape the section below is about: code that is correct, behaviour
+that is wrong, and nothing between the two that a machine can see.
+
+What passed unchanged: the skip link as first focusable element, and — the one I
+expected to fail — route changes, which announce the new heading rather than
+swapping content in silence.
 
 WebGL inside a container is software-rendered, which the capability probe
 correctly rejects — so containerised runs always exercise the fallback path and
@@ -227,6 +238,13 @@ requests and 225 KB of JavaScript that is downloaded and not used on first
 paint. A persistent WebGL canvas is precisely the shape that costs LCP, which is
 why the target was set before anything was built rather than after.
 
+The 225 KB is the three.js chunk, and tracing when it is fetched found it being
+downloaded *behind the consent gate* — an opaque full-screen wall over a canvas
+nobody can see until the gate is answered. The scene now waits for that answer.
+The table above is the measurement taken **before** that change; it stays as it
+is until a run against the deployed fix replaces it, because a table of numbers
+mixing two builds is worse than a table admitting it is out of date.
+
 CLS is a flat zero on both, which is the number that usually suffers on a site
 with this much motion.
 
@@ -245,8 +263,13 @@ stand-ins are variable fonts carrying their whole design space. Stated rather
 than quietly dropped.
 
 Real-device check: the site was exercised by hand on a phone — the sculpture
-renders, scrolling holds up, and the desk's faders drag under touch. Frame rate
-was not instrumented, so no fps figure is claimed.
+renders, scrolling holds up, and the desk's faders drag under touch.
+
+Appending `?fps=1` to any URL prints a live reading in the corner: the rolling
+mean, and the slowest single frame in the window. The mean is what the degrade
+guard acts on; the worst frame is what a 30 fps floor is actually about, since a
+mean of 58 containing one 90 ms frame is a stutter somebody felt. It is absent
+unless the URL asks for it, so a normal visit pays nothing for it.
 
 ## Three bugs worth reading about
 
@@ -273,39 +296,60 @@ and sweeping away afterwards has neither problem.
 
 ## Known gaps
 
-Named rather than left for someone to find.
+Named rather than left for someone to find. Two remain.
 
-1. **LCP is 2.9 s on mobile against a 2.5 s target.** A persistent WebGL canvas
-   is the likely cost. The lever is the render-blocking chain Lighthouse flags —
-   about 90 ms of it — and the 47 KB of unused JavaScript on first load.
-2. **The `M` shortcut is unusable under a screen reader.** NVDA's browse mode
-   claims single letters for its own navigation, so `M` never reaches the page.
-   That also puts it against WCAG 2.1.4, which requires a single-character
-   shortcut to be remappable, disableable, or scoped to a focused component.
-   The desk is still reachable by its button; the shortcut is a convenience that
-   only works for sighted keyboard users.
-3. **Heading navigation is unverified.** One NVDA pass reported no headings from
-   its starting position, which may have been browse-mode state rather than the
-   document. Not retested, so not claimed either way.
-4. **VoiceOver has not been run.** The NVDA pass covered Windows only.
-5. **No frame-rate instrumentation on mobile.** The site was checked by hand on
-   a real phone and behaves, but the 30 fps floor in the spec is unverified.
-6. **The pre-rendered fallback video does not exist.** The no-WebGL path is an
-   honest CSS composition rather than the specified 8-second loop.
-7. **The Process page** is specified as a pinned horizontal scrub and built as a
-   vertical list.
-8. **A custom domain**, which would also let Resend deliver to addresses other
-   than my own.
+1. **VoiceOver has not been run.** The hand pass covered NVDA on Windows. macOS
+   and iOS are untested, and I do not have the hardware to test them honestly. A
+   claim of "screen-reader accessible" resting on one screen reader is worth
+   exactly what it says and no more.
+2. **No custom domain.** The site is on a `vercel.app` subdomain, which also
+   means Resend will only deliver briefs to my own address. A portfolio piece
+   does not need one; it is listed because the deployment is otherwise complete.
+
+### Closed, with the evidence
+
+Kept visible rather than deleted, because how these were found is the more useful
+half.
+
+- **Mobile LCP.** Was 2.9 s against a 2.5 s target while desktop sat at 0.6 s,
+  which located the cost precisely: the three.js chunk was fetched immediately
+  after hydration, inside the LCP window, on a throttled phone. It was also being
+  fetched *behind the consent gate* — an opaque full-screen wall at z-9000 over a
+  canvas at z-0. Waiting for the gate to be answered is not a trick played on the
+  metric; it is declining to download something nobody can see.
+- **The `M` shortcut against WCAG 2.1.4.** A bare single-character shortcut has
+  to be remappable, disableable, or scoped to a focused component. It is now
+  scoped: `M` only reaches the page while focus is inside the transport bar.
+- **Heading navigation.** A real defect, not the unverified pass it was first
+  written up as. See the screen-reader section above.
+- **Frame rate on mobile.** Instrumented rather than asserted — `?fps=1` prints
+  the rolling mean and the worst frame in the window.
+- **The fallback video.** NFR-08 specifies an 8-second pre-rendered loop for
+  machines without WebGL; what ships is a static CSS composition. Closed as a
+  **revision to the spec rather than a thing built**, with the reasoning written
+  into [the PRD](docs/01-PRD.md) beside the clause it overrides: every route into
+  that profile — no WebGL2, under 4 GB of memory, a software rasteriser — is a
+  description of a slow machine, and the spec's answer was to hand that machine
+  1.3 MB of video on the LCP path so it could watch an imitation of the effect it
+  had just been found incapable of running. What is genuinely lost is that the
+  fallback no longer moves. That is the smaller cost.
+- **The Process page.** §6.6 specifies a pinned five-phase horizontal scrub with
+  a signal playhead, and it had shipped as a vertical list. Now built. The
+  vertical list is still the base markup, promoted to a horizontal track only at
+  `lg` and only under `prefers-reduced-motion: no-preference`, so the simple
+  version is the default rather than something reconstructed when an effect
+  declines to run.
 
 ## Specification
 
 Self-authored, in [docs/](docs/) — [PRD](docs/01-PRD.md),
 [UI/UX spec](docs/02-UIUX-Design-Spec.md) and
 [roadmap](docs/03-Roadmap-and-Plan.md). Each carries a note on what in it is
-invented and what is measured, and the design spec carries revision notes
-recording where its first draft was wrong: the contrast table, the shader
-constants, the geometry density, and a `ScrollTrigger.scrollerProxy` that was
-actively harmful. Those notes are the useful part.
+invented and what is measured, and both carry revision notes recording where the
+first draft was wrong: the contrast table, the shader constants, the geometry
+density, a `ScrollTrigger.scrollerProxy` that was actively harmful, and the
+fallback video that should never have been specified. Those notes are the useful
+part — a specification nobody argued with was not being read.
 
 Deployment runbook: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 

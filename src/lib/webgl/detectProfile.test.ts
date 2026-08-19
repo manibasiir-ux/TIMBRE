@@ -185,6 +185,31 @@ describe("FrameRateMonitor", () => {
     monitor.reset();
     expect(feed(monitor, 60, 1)).toBe(false);
   });
+
+  it("reports nothing until it has enough samples to mean anything", () => {
+    const monitor = new FrameRateMonitor();
+    expect(monitor.reading()).toBeNull();
+    feedFrames(monitor, 16, MIN_SAMPLES - 1);
+    expect(monitor.reading()).toBeNull();
+  });
+
+  it("reports the mean of a steady window", () => {
+    const monitor = new FrameRateMonitor();
+    feed(monitor, 60, 10);
+    expect(monitor.reading()?.mean).toBeCloseTo(60, 5);
+  });
+
+  it("separates the worst frame from the mean", () => {
+    // The case the readout exists for: a window that averages comfortably while
+    // containing a frame nobody would call smooth.
+    const monitor = new FrameRateMonitor();
+    feedFrames(monitor, 16, 200);
+    monitor.push(100);
+
+    const reading = monitor.reading();
+    expect(reading?.mean).toBeGreaterThan(45);
+    expect(reading?.worst).toBeCloseTo(10, 5);
+  });
 });
 
 describe("FrameRateMonitor tolerates stalls", () => {

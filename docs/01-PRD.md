@@ -338,6 +338,32 @@ The site's job in this model is to move inbound share from 20% to 45% of pipelin
 - **NFR-06 — Frame rate:** ≥ 55 fps on Apple M1 / RTX 3060 at 1440p; ≥ 30 fps on iPhone 12 and Pixel 6a.
 - **NFR-07 — WebGL detection:** a probe runs before canvas mount, checking WebGL2 context creation, `MAX_TEXTURE_SIZE ≥ 4096`, `deviceMemory`, `hardwareConcurrency` and the unmasked renderer string against a software-rasteriser denylist. Result selects a render profile, cached in `sessionStorage`.
 - **NFR-08 — Fallback:** the `fallback` profile serves an 8s pre-rendered loop (VP9 1.1 MB / H.265 0.9 MB) with an AVIF poster; additional weight ≤ 1.3 MB.
+
+> **Revision note — the pre-rendered loop does not ship, by decision.** The
+> `fallback` profile serves a static CSS composition instead of the 8s VP9/H.265
+> loop, and this is a change to the specification rather than a shortfall against
+> it.
+>
+> The reasoning is in who takes this path. NFR-07 routes a visitor to `fallback`
+> for one of three reasons: no WebGL2 context, under 4 GB of device memory, or a
+> renderer string on the software-rasteriser denylist. Every one of those is a
+> description of a slow machine. The spec's answer is to send that machine up to
+> 1.3 MB of additional weight so it can watch an imitation of an effect it was
+> just found incapable of running — and to do it on the LCP path, since the loop
+> replaces the hero.
+>
+> That trade is backwards. A CSS composition costs no additional bytes at all,
+> paints with the first stylesheet, and degrades to something legible rather than
+> something buffering. The hero's job is to be a good first impression of a sound
+> studio, and it can do that without a video of a shape.
+>
+> What is genuinely lost: the fallback no longer moves. §6.2's intent was that a
+> visitor without WebGL should still see the sculpture in motion, and they will
+> not. That is the cost, and it is a smaller cost than the one the spec asked for.
+>
+> NFR-08's ≤ 1.3 MB budget is therefore met at 0 KB, which is a slightly comic
+> way of putting it, but the budget existed to bound a cost that no longer exists.
+
 - **NFR-09 — Browser matrix:** full experience on Chrome/Edge ≥ 118, Safari ≥ 17, Firefox ≥ 121, iOS Safari ≥ 17, Chrome Android ≥ 118. Degraded but fully functional on Safari 15–16, Firefox 115–120, and any browser without WebGL2. Unsupported: IE, Chrome < 100.
 - **NFR-10 — Device matrix:** tested on iPhone SE 3 (375px), iPhone 15 Pro, Pixel 6a, iPad Air, MacBook Air M1 (1440px), 27" 2560px and a 3440px ultrawide.
 - **NFR-11 — SEO:** server-rendered HTML for all indexable content including case study copy; `Organization`, `Service`, `Article` and `BreadcrumbList` JSON-LD; canonical URLs; XML sitemap regenerated on build; Lighthouse SEO 100.

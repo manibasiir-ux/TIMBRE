@@ -92,12 +92,19 @@ export function ConsentGate() {
       aria-describedby="consent-note"
       className="fixed inset-0 z-[9000] flex flex-col items-center justify-center gap-12 bg-ground px-6"
     >
-      <p
+      {/* A heading, not a paragraph. `aria-modal` confines a screen reader's
+          virtual buffer to this subtree, so while the gate is open the dialog is
+          the whole document as far as heading navigation is concerned. With the
+          title set as a <p> the buffer contained no headings at all and NVDA
+          answered "no next heading" to the first key a visitor is likely to
+          press — on a site whose homepage has six. h2 rather than h1: the hero
+          owns the page's h1, and this renders after it in document order. */}
+      <h2
         id="consent-title"
         className="font-display text-display text-ink"
       >
         TIMBRE
-      </p>
+      </h2>
 
       <div className="flex flex-col items-stretch gap-3">
         <button

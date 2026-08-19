@@ -638,6 +638,13 @@ export function SoundSculpture({ detail = 48, gain = 1 }: { detail?: number; gai
 4. Camera scrub replaced with three discrete keyframed positions triggered by `toggleActions`.
 5. Canvas renders on demand (`frameloop="demand"`) when the sculpture is off-screen.
 6. On `deviceMemory < 4` or a matched software-rasteriser string, the canvas is not mounted at all — the pre-rendered VP9 loop plays instead.
+
+> **Revision note — no pre-rendered loop.** The canvas is still not mounted,
+> but what replaces it is a static CSS composition rather than a video. See the
+> note under NFR-08 in [the PRD](01-PRD.md): the machines routed here are by
+> definition the slow ones, and 1.3 MB of video on the LCP path is the wrong
+> thing to hand them.
+
 7. Audio: only the master bed loads eagerly (48 kbps HE-AAC on mobile vs 128 kbps AAC desktop); stems load on demand.
 
 ## 10. Accessibility

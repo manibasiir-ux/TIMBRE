@@ -197,6 +197,23 @@ export class FrameRateMonitor {
     return 1000 / meanDelta < this.minFps;
   }
 
+  /**
+   * The current window as a readable pair, or null before it is full.
+   *
+   * `mean` is the figure the degrade decision above acts on. `worst` is the
+   * slowest single frame in the window, which is what a frame-rate floor is
+   * actually about: a mean of 58 with one 90 ms frame in it is a stutter
+   * somebody felt, and the mean alone hides it.
+   */
+  reading(): { mean: number; worst: number } | null {
+    if (this.samples.length < MIN_SAMPLES) return null;
+
+    return {
+      mean: 1000 / (this.elapsed / this.samples.length),
+      worst: 1000 / Math.max(...this.samples),
+    };
+  }
+
   reset(): void {
     this.samples = [];
     this.elapsed = 0;

@@ -2,7 +2,13 @@
 
 import { PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { caseBySlug } from "@/content/cases";
 import { onSculptureRenderRequest } from "@/lib/motion/sculptureRender";
@@ -118,6 +124,49 @@ function PerformanceGuard({ onDegrade }: { onDegrade: () => void }) {
   return null;
 }
 
+/**
+ * An on-screen frame-rate reading, opt-in with `?fps=1`.
+ *
+ * FR-11 puts a 30 fps floor on mid-tier mobile, and the site already had the
+ * machinery to act on frame rate — PerformanceGuard above degrades the profile
+ * below 45 — but no way for a person to read the number. "Checked by hand on a
+ * real phone and it behaves" is an impression, not a measurement, and a phone
+ * cannot be hung off a profiler as casually as a desktop can. Appending a query
+ * parameter is something the owner of the phone can do.
+ *
+ * Absent unless the URL asks for it, so a normal visit pays nothing for it.
+ *
+ * Written straight to the DOM rather than through state. Four React renders a
+ * second to display a performance number would mean measuring the instrument
+ * along with the thing.
+ */
+function FrameRateReadout({
+  onSample,
+}: {
+  onSample: (text: string) => void;
+}) {
+  const monitor = useMemo(() => new FrameRateMonitor(), []);
+  const sincePaint = useRef(0);
+
+  useFrame((_, delta) => {
+    const deltaMs = delta * 1000;
+    monitor.push(deltaMs);
+
+    sincePaint.current += deltaMs;
+    if (sincePaint.current < 250) return;
+    sincePaint.current = 0;
+
+    const reading = monitor.reading();
+    onSample(
+      reading
+        ? `${Math.round(reading.mean)} fps · worst ${Math.round(reading.worst)}`
+        : "measuring",
+    );
+  });
+
+  return null;
+}
+
 export default function SceneRoot() {
   // Probed in a lazy initialiser, not an effect. This component is imported with
   // ssr: false so it only ever runs on the client, and deciding on first render
@@ -130,6 +179,14 @@ export default function SceneRoot() {
   const [documentVisible, setDocumentVisible] = useState(
     () => !document.hidden,
   );
+
+  // Read once from the URL rather than watched: a reading that appeared and
+  // vanished as the query string changed would be a distraction, and this is
+  // only ever switched on deliberately at load.
+  const [showFrameRate] = useState(
+    () => new URLSearchParams(window.location.search).has("fps"),
+  );
+  const frameRateNode = useRef<HTMLParagraphElement>(null);
 
   const publishProfile = useExperience((state) => state.setProfile);
   const activeCase = useExperience((state) => state.activeCase);
@@ -151,6 +208,11 @@ export default function SceneRoot() {
     setProfile((current) => stepDown(current));
   }, []);
 
+  const showFrameRateSample = useCallback((text: string) => {
+    const node = frameRateNode.current;
+    if (node) node.textContent = text;
+  }, []);
+
   if (profile === "fallback") return <HeroFallback />;
 
   const settings = PROFILE_SETTINGS[profile];
@@ -168,47 +230,64 @@ export default function SceneRoot() {
     : "Abstract sound sculpture reacting to the TIMBRE showreel.";
 
   return (
-    <div
-      className="pointer-events-none fixed inset-0 z-0"
-      role="img"
-      aria-label={description}
-    >
-      <Canvas
-        dpr={settings.dpr}
-        frameloop={frameloop}
-        camera={{ position: [0, 0, BASE_CAMERA_Z], fov: 42 }}
-        gl={{
-          antialias: profile === "high",
-          powerPreference: "high-performance",
-        }}
-        // §10: the canvas itself carries no information and is never focusable.
-        // The container above holds the accessible name.
-        onCreated={({ gl }) => {
-          gl.domElement.setAttribute("aria-hidden", "true");
-          gl.domElement.setAttribute("tabindex", "-1");
-        }}
+    <>
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        role="img"
+        aria-label={description}
       >
-        <ResponsiveCamera />
-        <SoundSculpture
-          detail={settings.detail}
-          reducedMotion={reducedMotion}
-        />
-        <RenderRequestBridge />
-        {driveFromTicker && <TickerBridge />}
-        {driveFromTicker && <PerformanceGuard onDegrade={degrade} />}
-      </Canvas>
+        <Canvas
+          dpr={settings.dpr}
+          frameloop={frameloop}
+          camera={{ position: [0, 0, BASE_CAMERA_Z], fov: 42 }}
+          gl={{
+            antialias: profile === "high",
+            powerPreference: "high-performance",
+          }}
+          // §10: the canvas itself carries no information and is never focusable.
+          // The container above holds the accessible name.
+          onCreated={({ gl }) => {
+            gl.domElement.setAttribute("aria-hidden", "true");
+            gl.domElement.setAttribute("tabindex", "-1");
+          }}
+        >
+          <ResponsiveCamera />
+          <SoundSculpture
+            detail={settings.detail}
+            reducedMotion={reducedMotion}
+          />
+          <RenderRequestBridge />
+          {driveFromTicker && <TickerBridge />}
+          {driveFromTicker && <PerformanceGuard onDegrade={degrade} />}
+          {showFrameRate && <FrameRateReadout onSample={showFrameRateSample} />}
+        </Canvas>
 
       {/* Hero vignette, the role §3 assigns to --color-ground-deep. Settles the
           sculpture into the page rather than letting it float as a bright object
           on a flat field, and darkens the edges where content sits. */}
       <div
-        className="pointer-events-none absolute inset-0"
-        aria-hidden="true"
-        style={{
-          background:
-            "radial-gradient(115% 85% at 50% 42%, transparent 0%, transparent 38%, rgb(5 5 6 / 0.45) 72%, rgb(5 5 6 / 0.8) 100%)",
-        }}
-      />
-    </div>
+          className="pointer-events-none absolute inset-0"
+          aria-hidden="true"
+          style={{
+            background:
+              "radial-gradient(115% 85% at 50% 42%, transparent 0%, transparent 38%, rgb(5 5 6 / 0.45) 72%, rgb(5 5 6 / 0.8) 100%)",
+          }}
+        />
+      </div>
+
+      {/* Outside the container above, which sits at z-0 and so would bury this
+          under the page. Diagnostic rather than content, hence aria-hidden: a
+          number ticking four times a second is nothing a screen reader should
+          be made to read out. */}
+      {showFrameRate && (
+        <p
+          ref={frameRateNode}
+          aria-hidden="true"
+          className="pointer-events-none fixed right-3 bottom-3 z-[9500] bg-ground/85 px-3 py-2 font-mono text-mono-xs text-signal tabular-nums"
+        >
+          measuring
+        </p>
+      )}
+    </>
   );
 }
