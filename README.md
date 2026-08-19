@@ -201,28 +201,34 @@ never the real hero. Frame-rate targets have to be measured on the host.
 ## Measured, not estimated
 
 Lighthouse, run through PageSpeed Insights against the live deployment — an
-emulated Moto G Power on Slow 4G for mobile.
+emulated Moto G Power on Slow 4G for mobile. Two runs, and both are quoted,
+because a single run of a lab test is a sample rather than a number.
 
 | | Mobile | Desktop |
 |---|---|---|
-| Performance | **95** | **100** |
+| Performance | **93 – 95** | **99 – 100** |
 | Accessibility | **100** | **100** |
 | Best Practices | **100** | **100** |
-| SEO | **91** | **100** |
+| SEO | **100** | **100** |
 
-| Metric | Mobile | Target |
-|---|---|---|
-| Largest Contentful Paint | 2.9 s | ≤ 2.5 s — **missed** |
-| First Contentful Paint | 1.0 s | — |
-| Cumulative Layout Shift | **0** | ≤ 0.05 |
-| Total Blocking Time | 50 ms | — |
-| Speed Index | 2.4 s | — |
+| Metric | Mobile | Desktop | Target |
+|---|---|---|---|
+| Largest Contentful Paint | 2.9 – 3.0 s | 0.6 s | ≤ 2.5 s mobile — **missed** · ≤ 2.0 s desktop — met |
+| First Contentful Paint | 1.0 s | 0.3 s | — |
+| Cumulative Layout Shift | **0** | **0** | ≤ 0.05 |
+| Total Blocking Time | 50 – 140 ms | 90 ms | — |
+| Speed Index | 2.4 s | 0.9 s | — |
 
-**Two of these miss the spec, and both are worth stating.** LCP is 2.9 s against
-a stated 2.5 s on exactly the device profile the spec names, and mobile SEO is
-91 against a stated 100. Neither is fatal and both are real: a persistent WebGL
-canvas is precisely the shape that costs LCP, which is why the target was set
-before anything was built rather than after.
+**One target is missed and it is the interesting one.** Mobile LCP lands around
+2.9 – 3.0 s against a stated 2.5 s, on exactly the device profile the spec
+names. Desktop LCP is 0.6 s against a 2.0 s target, so the cost is specific to a
+throttled phone: Lighthouse points at roughly 70 – 90 ms of render-blocking
+requests and 225 KB of JavaScript that is downloaded and not used on first
+paint. A persistent WebGL canvas is precisely the shape that costs LCP, which is
+why the target was set before anything was built rather than after.
+
+CLS is a flat zero on both, which is the number that usually suffers on a site
+with this much motion.
 
 Bundle and paint budgets, from the build's own gate:
 
@@ -272,25 +278,23 @@ Named rather than left for someone to find.
 1. **LCP is 2.9 s on mobile against a 2.5 s target.** A persistent WebGL canvas
    is the likely cost. The lever is the render-blocking chain Lighthouse flags —
    about 90 ms of it — and the 47 KB of unused JavaScript on first load.
-2. **Mobile SEO scores 91 against a stated 100.** Desktop is 100, so it is a
-   mobile-specific audit rather than a content problem.
-3. **The `M` shortcut is unusable under a screen reader.** NVDA's browse mode
+2. **The `M` shortcut is unusable under a screen reader.** NVDA's browse mode
    claims single letters for its own navigation, so `M` never reaches the page.
    That also puts it against WCAG 2.1.4, which requires a single-character
    shortcut to be remappable, disableable, or scoped to a focused component.
    The desk is still reachable by its button; the shortcut is a convenience that
    only works for sighted keyboard users.
-4. **Heading navigation is unverified.** One NVDA pass reported no headings from
+3. **Heading navigation is unverified.** One NVDA pass reported no headings from
    its starting position, which may have been browse-mode state rather than the
    document. Not retested, so not claimed either way.
-5. **VoiceOver has not been run.** The NVDA pass covered Windows only.
-6. **No frame-rate instrumentation on mobile.** The site was checked by hand on
+4. **VoiceOver has not been run.** The NVDA pass covered Windows only.
+5. **No frame-rate instrumentation on mobile.** The site was checked by hand on
    a real phone and behaves, but the 30 fps floor in the spec is unverified.
-7. **The pre-rendered fallback video does not exist.** The no-WebGL path is an
+6. **The pre-rendered fallback video does not exist.** The no-WebGL path is an
    honest CSS composition rather than the specified 8-second loop.
-8. **The Process page** is specified as a pinned horizontal scrub and built as a
+7. **The Process page** is specified as a pinned horizontal scrub and built as a
    vertical list.
-9. **A custom domain**, which would also let Resend deliver to addresses other
+8. **A custom domain**, which would also let Resend deliver to addresses other
    than my own.
 
 ## Specification
