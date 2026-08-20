@@ -2,11 +2,21 @@
 
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { WaveformRule } from "@/components/primitives/WaveformRule";
 
 gsap.registerPlugin(ScrollTrigger);
+
+/**
+ * `useLayoutEffect` on the client, `useEffect` on the server.
+ *
+ * This component is server-rendered before it hydrates, and `useLayoutEffect`
+ * warns there. Nothing needs cleaning up during an SSR pass, so the fallback
+ * costs nothing.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
  * The five-phase timeline, specification §6.6.
@@ -54,7 +64,13 @@ export function ProcessTimeline({
   const track = useRef<HTMLOListElement>(null);
   const playhead = useRef<HTMLSpanElement>(null);
 
-  useEffect(() => {
+  // A layout effect, not a passive one, because this pins. `pin: true` makes
+  // ScrollTrigger wrap the pinned section in a `pin-spacer` div, reparenting it
+  // out from under React. A passive cleanup reverts that *after* React has
+  // already detached the subtree, so React calls removeChild on the original
+  // parent and the browser throws NotFoundError, which escapes rendering and
+  // kills the whole tree. Same reasoning as WorkRail; see the note there.
+  useIsomorphicLayoutEffect(() => {
     const section = root.current;
     const rail = track.current;
     if (!section || !rail) return;
