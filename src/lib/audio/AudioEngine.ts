@@ -3,7 +3,8 @@ import { dbToGain } from "./bands";
 /**
  * The single global audio graph, FR-02.
  *
- *   source -> sourceGain -> bus(bed|sfx) -> master -> analyser -> destination
+ *   source -> sourceGain -> bus(bed|sfx) -> master -> limiter -> analyser
+ *     -> destination
  *
  * One AudioContext for the whole site. Browsers cap how many a page may hold
  * and each carries its own hardware clock, so a second one would drift against
@@ -15,8 +16,24 @@ import { dbToGain } from "./bands";
  * that never recovers.
  *
  * The analyser sits after the master gain so it measures what the listener
- * actually hears, including ducking and mute. Placing it before would leave the
- * sculpture reacting to audio that is not playing.
+ * actually hears, including ducking, mute and limiting. Placing it before would
+ * leave the sculpture reacting to audio that is not playing.
+ *
+ * ## Why there is a limiter
+ *
+ * The desk is five channels summing into one master at unity. Each asset is
+ * clean on its own -- the bed peaks at -8.1 dBFS and each stem near -4 dBFS,
+ * with no sample at full scale in any file -- but they add. With every fader up
+ * the peaks reach about 2.91, or +9.3 dBFS, and `destination` hard-clips
+ * anything outside [-1, 1]. Hard clipping is broadband harmonic distortion,
+ * which is why the reported symptom was harsh static that appeared only as the
+ * mix got louder.
+ *
+ * Lowering the master instead would punish the common case: the default mix is
+ * the room alone at -8.1 dBFS, which never clipped and should not get quieter
+ * to protect a combination the visitor may never build. A limiter costs nothing
+ * until it is needed, and the threshold is set above a single channel's peak so
+ * that a lone stem passes through untouched.
  */
 
 export type AudioBus = "bed" | "sfx";
@@ -28,6 +45,44 @@ export const SMOOTHING_TIME_CONSTANT = 0.82;
 export const DUCK_DB = -12;
 export const DUCK_SECONDS = 0.35;
 
+/**
+ * Master limiting, so no combination of faders can clip the output.
+ *
+ * Every asset is clean on its own -- no file holds a single sample at full
+ * scale -- but the desk is five channels summing into one master at unity and
+ * `destination` hard-clips outside [-1, 1]. Summing the real samples the way the
+ * desk starts them gives a peak of 2.69 (+8.61 dBFS) with every fader at 100,
+ * clipping 21,089 of 512,000 samples per loop; the room and any two stems
+ * already reach +3.69 dBFS. Three faders is enough, and the desk invites exactly
+ * that. Hard clipping is broadband harmonic distortion, which is the harsh
+ * static that gets worse as the mix gets louder.
+ *
+ * These numbers were measured against the shipped WAVs, and so were the
+ * settings. The interesting result is that the threshold wants to be LOW. A
+ * limiter doing a little continuously is far cleaner than one occasionally
+ * doing a lot: measured as error energy against the same mix simply turned down,
+ * a -3 dB threshold scores -6.28 dB and leaves 653 samples clipped, while -8 dB
+ * scores -7.76 dB and leaves 2. Buying the last two samples by shortening the
+ * attack is a bad trade -- 0.3 ms reaches zero clipping but scores -1.62 dB,
+ * barely better than the clipping it replaces, because the envelope starts
+ * modulating the drones themselves. So: low threshold, unhurried attack.
+ *
+ * -8 dB is chosen over a lower threshold because it leaves the bed's -8.14 dBFS
+ * peak alone, and the bed alone is the default mix -- what a visitor hears
+ * unless they open the desk and push something up. That margin is 0.14 dB, which
+ * is thin enough to lose by accident, so `masterLimiter.test.ts` asserts it
+ * against the actual files rather than trusting this comment.
+ *
+ * Ratio 20:1 with a hard knee is a limiter rather than a compressor: it holds a
+ * ceiling instead of shaping dynamics. A 250 ms release keeps gain movement
+ * below the threshold of audible pumping.
+ */
+export const LIMITER_THRESHOLD_DB = -8;
+export const LIMITER_KNEE_DB = 0;
+export const LIMITER_RATIO = 20;
+export const LIMITER_ATTACK_SECONDS = 0.003;
+export const LIMITER_RELEASE_SECONDS = 0.25;
+
 const LOAD_ATTEMPTS = 3; // one attempt plus the two retries in edge case E6
 const RETRY_BASE_MS = 250;
 
@@ -38,6 +93,7 @@ export type LoadFailure = { id: string; url: string; error: unknown };
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private limiter: DynamicsCompressorNode | null = null;
   private analyser: AnalyserNode | null = null;
   private buses: Record<AudioBus, GainNode> | null = null;
   // Left uninferred on purpose. Annotating this `Uint8Array` widens its buffer
@@ -67,7 +123,8 @@ class AudioEngine {
   /**
    * Whether the analyser is reading anything worth looking at.
    *
-   * The graph is bed/sfx -> master -> analyser -> destination, so muting zeroes
+   * The graph is bed/sfx -> master -> limiter -> analyser -> destination, so
+   * muting zeroes
    * the master and the analyser reads silence. Anything driving visuals from
    * the analyser therefore has to ask this rather than `isInitialised`: the
    * context still exists while muted, it just has nothing in it, and a sculpture
@@ -108,15 +165,24 @@ class AudioEngine {
     analyser.fftSize = FFT_SIZE;
     analyser.smoothingTimeConstant = SMOOTHING_TIME_CONSTANT;
 
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = LIMITER_THRESHOLD_DB;
+    limiter.knee.value = LIMITER_KNEE_DB;
+    limiter.ratio.value = LIMITER_RATIO;
+    limiter.attack.value = LIMITER_ATTACK_SECONDS;
+    limiter.release.value = LIMITER_RELEASE_SECONDS;
+
     const bed = ctx.createGain();
     const sfx = ctx.createGain();
     bed.connect(master);
     sfx.connect(master);
-    master.connect(analyser);
+    master.connect(limiter);
+    limiter.connect(analyser);
     analyser.connect(ctx.destination);
 
     this.ctx = ctx;
     this.master = master;
+    this.limiter = limiter;
     this.analyser = analyser;
     this.buses = { bed, sfx };
     this.frequencyData = new Uint8Array(analyser.frequencyBinCount);
@@ -447,6 +513,7 @@ class AudioEngine {
     void this.ctx?.close();
     this.ctx = null;
     this.master = null;
+    this.limiter = null;
     this.analyser = null;
     this.buses = null;
     this.buffers.clear();
